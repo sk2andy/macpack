@@ -36,7 +36,10 @@ Commands with `--file` also work without it. Default lookup:
 1. `./packages.macpack`
 2. `~/.config/macpack/packages.macpack`
 
-`add` creates the resolved target if it does not exist.
+Use `--global` to force `~/.config/macpack/packages.macpack`. If neither
+default exists, read commands fail with a clear error. `add` creates
+`./packages.macpack` with a log message unless `--global` or `--file` was
+passed.
 
 ## `apply [--file <path>]`
 
@@ -65,6 +68,7 @@ Examples:
 
 ```bash
 macpack add brew gh
+macpack add --global brew gh
 macpack add npm typescript@5.9.3 tsx
 macpack add uv --python 3.14 serena-agent
 macpack add mas --id 409183694 Keynote

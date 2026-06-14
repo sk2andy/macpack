@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { intro, isCancel, log, multiselect, outro, cancel } from "@clack/prompts";
 import { Command } from "commander";
-import { resolveManifestPath } from "../config/defaults.js";
+import { configManifestPath, localManifestPath, pathExists, resolveManifestPath } from "../config/defaults.js";
 import { filterManifest, formatExport, type ExportFilter, type ExportFormat } from "../config/exporters.js";
 import { addEntries, removeEntries, type ManifestEntryKind } from "../config/mutate.js";
 import { parseManifestFile } from "../config/parser.js";
@@ -22,6 +22,7 @@ import { VERSION } from "../version.js";
 
 interface FileOptions {
   file?: string;
+  global?: boolean;
 }
 
 interface MutatingOptions extends FileOptions {
@@ -76,6 +77,7 @@ export function createProgram(): Command {
     .command("apply")
     .description("Install/update all packages from a manifest.")
     .option("-f, --file <path>", "Manifest file")
+    .option("--global", "Use the global config manifest")
     .option("--cleanup", "Remove installed tools not present in manifest")
     .option("-y, --yes", "Answer yes to trust prompts")
     .option("--dry-run", "Print commands without running them")
@@ -83,7 +85,7 @@ export function createProgram(): Command {
     .action(async (options: MutatingOptions) => {
       assertMacOS();
       intro("macpack apply");
-      const file = await resolveManifestPath(options.file);
+      const file = await resolveManifestPath(options.file, { global: options.global });
       const manifest = await parseManifestFile(file);
       await applyAll(manifest, {
         cleanup: options.cleanup,
@@ -98,13 +100,14 @@ export function createProgram(): Command {
     .command("cleanup")
     .description("Remove installed global packages/tools not present in manifest.")
     .option("-f, --file <path>", "Manifest file")
+    .option("--global", "Use the global config manifest")
     .option("-y, --yes", "Assume yes where a prompt is needed")
     .option("--dry-run", "Print commands without running them")
     .option("--verbose", "Stream command output instead of collapsing successful steps")
     .action(async (options: MutatingOptions) => {
       assertMacOS();
       intro("macpack cleanup");
-      const file = await resolveManifestPath(options.file);
+      const file = await resolveManifestPath(options.file, { global: options.global });
       const manifest = await parseManifestFile(file);
       await cleanupAll(manifest, {
         dryRun: options.dryRun,
@@ -120,10 +123,11 @@ export function createProgram(): Command {
     .argument("<kind>", "tap, brew, cask, mas, npm, pnpm, bun, or uv")
     .argument("<packages...>", "Package names, uv specs, or one mas app name")
     .option("-f, --file <path>", "Manifest file")
+    .option("--global", "Use or create the global config manifest")
     .option("-p, --python <version>", "Python version for uv entries")
     .option("--id <app-id>", "Mac App Store app id for mas entries")
     .action(async (kind: ManifestEntryKind, packages: string[], options: AddOptions) => {
-      const file = await resolveManifestPath(options.file);
+      const file = await resolveWritableManifestPath(options.file, { global: options.global });
       const result = await addEntries(file, normalizeKind(kind), packages, {
         python: options.python,
         masId: options.id,
@@ -138,8 +142,9 @@ export function createProgram(): Command {
     .argument("<kind>", "tap, brew, cask, mas, npm, pnpm, bun, or uv")
     .argument("<packages...>", "Package names, uv package names, mas ids, or mas names")
     .option("-f, --file <path>", "Manifest file")
+    .option("--global", "Use the global config manifest")
     .action(async (kind: ManifestEntryKind, packages: string[], options: FileOptions) => {
-      const file = await resolveManifestPath(options.file);
+      const file = await resolveManifestPath(options.file, { global: options.global });
       const result = await removeEntries(file, normalizeKind(kind), packages);
       log.success(`Removed ${result.removed ?? 0} entr${result.removed === 1 ? "y" : "ies"} from ${result.path}`);
     });
@@ -149,6 +154,7 @@ export function createProgram(): Command {
     .description("Find and install newer versions for manifest entries.")
     .argument("[manager]", "brew, npm, pnpm, bun, uv, or all", "all")
     .option("-f, --file <path>", "Manifest file")
+    .option("--global", "Use the global config manifest")
     .option("--all", "Upgrade/install all matching manifest entries without prompting")
     .option("-y, --yes", "Answer yes to trust prompts")
     .option("--dry-run", "Print commands without running them")
@@ -156,7 +162,7 @@ export function createProgram(): Command {
     .action(async (manager: string, options: UpgradeOptions) => {
       assertMacOS();
       intro("macpack upgrade");
-      const file = await resolveManifestPath(options.file);
+      const file = await resolveManifestPath(options.file, { global: options.global });
       const manifest = await parseManifestFile(file);
       const managers = selectedManagers(manager);
 
@@ -194,6 +200,7 @@ export function createProgram(): Command {
     .command("export")
     .description("Export manifest entries in another format.")
     .option("-f, --file <path>", "Manifest file")
+    .option("--global", "Use the global config manifest")
     .option("-o, --output <path>", "Write export to path")
     .option("--only-brew", "Only include Homebrew tap/brew/cask/mas entries")
     .option("--only-npm", "Only include npm entries")
@@ -205,7 +212,7 @@ export function createProgram(): Command {
     .option("--requirements-txt", "Export uv tool package names as requirements.txt")
     .option("--manifest", "Export as macpack manifest")
     .action(async (options: ExportOptions) => {
-      const file = await resolveManifestPath(options.file);
+      const file = await resolveManifestPath(options.file, { global: options.global });
       const manifest = await parseManifestFile(file);
       const format = exportFormat(options);
       const filtered = filterManifest(manifest, exportFilter(options));
@@ -217,8 +224,9 @@ export function createProgram(): Command {
     .command("check")
     .description("Parse manifest and print package counts.")
     .option("-f, --file <path>", "Manifest file")
+    .option("--global", "Use the global config manifest")
     .action(async (options: FileOptions) => {
-      const file = await resolveManifestPath(options.file);
+      const file = await resolveManifestPath(options.file, { global: options.global });
       const manifest = await parseManifestFile(file);
       console.table({
         taps: manifest.taps.length,
@@ -251,6 +259,21 @@ export function createProgram(): Command {
     });
 
   return program;
+}
+
+async function resolveWritableManifestPath(file?: string, options: { global?: boolean } = {}): Promise<string> {
+  if (file && options.global) throw new Error("Use either --file or --global, not both.");
+  if (file) return resolve(file);
+  if (options.global) return configManifestPath();
+
+  const local = localManifestPath();
+  if (await pathExists(local)) return local;
+
+  const config = configManifestPath();
+  if (await pathExists(config)) return config;
+
+  log.info(`No manifest found. Creating ${local}`);
+  return local;
 }
 
 function normalizeKind(kind: string): ManifestEntryKind {

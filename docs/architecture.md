@@ -27,9 +27,11 @@ macpack avoids broad `upgrade all globals` commands. Apply operations target pac
 
 Commands with `--file` accept an explicit manifest path. Without it, macpack
 uses `./packages.macpack` when present, otherwise
-`~/.config/macpack/packages.macpack`. Setup can create the config default,
-optionally prefill it from installed packages, and `add` creates the resolved
-target on first write.
+`~/.config/macpack/packages.macpack`. `--global` forces the config manifest. If
+neither exists, read commands fail with a clear error. Setup can create the
+config default and optionally prefill it from installed packages. `add` creates
+`./packages.macpack` when neither default exists. `add --global` writes the
+config manifest directly.
 
 ## Discovery Flow
 

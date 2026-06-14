@@ -117,8 +117,11 @@ manifest in this order:
 2. `~/.config/macpack/packages.macpack`.
 
 `macpack setup` asks whether it should create the config default. If yes, it
-also asks whether to prefill it from currently installed packages. `macpack add`
-creates the target manifest if it does not exist.
+also asks whether to prefill it from currently installed packages. Commands can
+force the global config manifest with `--global`. `macpack add --global` creates
+that file if it does not exist. Without `--file` or `--global`, `add` uses the
+default lookup and creates `./packages.macpack` with a log message if neither
+default exists.
 
 ## Commands
 
@@ -206,7 +209,14 @@ macpack add mas --id 409183694 Keynote
 ```
 
 Use `--file <path>` to edit a specific manifest. Without `--file`, macpack uses
-the default manifest lookup.
+the default manifest lookup. If neither default exists, `add` creates
+`./packages.macpack` and logs that path.
+
+Use `--global` to edit `~/.config/macpack/packages.macpack` directly:
+
+```bash
+macpack add --global brew gh
+```
 
 ### `remove`
 
