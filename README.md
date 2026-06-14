@@ -30,6 +30,22 @@ npm run build
 node dist/index.js --help
 ```
 
+## Install With Homebrew
+
+```bash
+brew tap sk2andy/tap
+brew install macpack
+```
+
+Or install directly:
+
+```bash
+brew install sk2andy/tap/macpack
+```
+
+The Homebrew formula installs the `v0.1` macOS Apple Silicon executable from
+the GitHub release.
+
 For local development:
 
 ```bash
