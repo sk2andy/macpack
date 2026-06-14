@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { intro, log, outro } from "@clack/prompts";
@@ -10,6 +9,7 @@ import { assertMacOS, isMacOS } from "../core/platform.js";
 import { applyAll, cleanupAll } from "../installers/index.js";
 import { doctorBrew } from "../installers/brew.js";
 import { runSetup } from "../setup/setup.js";
+import { VERSION } from "../version.js";
 
 interface FileOptions {
   file: string;
@@ -26,13 +26,12 @@ interface BrewfileOptions extends FileOptions {
 }
 
 export function createProgram(): Command {
-  const packageJson = createRequire(import.meta.url)("../../package.json") as { version: string };
   const program = new Command();
 
   program
     .name("macpack")
     .description("Universal macOS package manager for Homebrew, npm, pnpm, bun, and uv.")
-    .version(packageJson.version);
+    .version(VERSION);
 
   program
     .command("setup")

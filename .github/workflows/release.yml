@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version/tag, for example v0.1"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build macOS Apple Silicon executable
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify
+        run: |
+          npm run typecheck
+          npm test
+          npm audit --audit-level=high
+
+      - name: Build executable
+        run: npm run build:executable
+
+      - name: Prepare release assets
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION_CLEAN="${VERSION#v}"
+          ASSET_DIR="build/assets"
+          mkdir -p "$ASSET_DIR"
+          tar -czf "$ASSET_DIR/macpack-${VERSION_CLEAN}-darwin-arm64.tar.gz" -C build/release macpack README.txt
+          git archive --format=tar.gz --prefix="macpack-${VERSION_CLEAN}/" -o "$ASSET_DIR/macpack-${VERSION_CLEAN}-source.tar.gz" HEAD
+          shasum -a 256 "$ASSET_DIR"/* > "$ASSET_DIR/checksums.txt"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          gh release create "$VERSION" build/assets/* \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --notes "macpack $VERSION for macOS Apple Silicon. Includes source archive and darwin-arm64 executable."

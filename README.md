@@ -37,6 +37,19 @@ npm run dev -- --help
 npm run dev -- check --file examples/packages.macpack
 ```
 
+## Build A macOS Executable
+
+On macOS Apple Silicon with Node.js 26:
+
+```bash
+npm run build:executable
+./build/release/macpack --help
+```
+
+The executable is built with Node's Single Executable Application support. It is
+written to `build/release/macpack`; `build/` and `dist/` are ignored and not
+committed.
+
 ## Manifest Format
 
 macpack uses a small, shell-like DSL. It is parsed by macpack and not executed as
@@ -152,9 +165,19 @@ npm install
 npm run typecheck
 npm test
 npm run build
+npm run build:executable
 npm audit --audit-level=high
 npm pack --dry-run
 ```
+
+## Releases
+
+Releases are built by GitHub Actions. Run the `Release` workflow manually and
+provide a tag/version such as `v0.1`.
+
+The workflow runs on GitHub's `macos-26` arm64 runner, builds a darwin-arm64
+executable, creates a source archive, creates checksums, and publishes a GitHub
+Release with those assets.
 
 ## Project Structure
 
