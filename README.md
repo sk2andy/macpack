@@ -142,6 +142,32 @@ macpack brewfile --file examples/packages.macpack
 macpack brewfile --file examples/packages.macpack --output Brewfile
 ```
 
+### `export`
+
+Export the manifest, or selected managers, into another format:
+
+```bash
+macpack export --file examples/packages.macpack
+macpack export --file examples/packages.macpack --only-brew --brewfile
+macpack export --file examples/packages.macpack --package-json
+macpack export --file examples/packages.macpack --only-uv --requirements-txt
+```
+
+Filters:
+
+- `--only-brew`
+- `--only-npm`
+- `--only-pnpm`
+- `--only-bun`
+- `--only-uv`
+
+Formats:
+
+- default macpack manifest
+- `--brewfile`
+- `--package-json`
+- `--requirements-txt`
+
 ### `check`
 
 Parse the manifest and print counts:

@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { intro, log, outro } from "@clack/prompts";
 import { Command } from "commander";
 import { formatBrewfile } from "../config/brewfile.js";
+import { filterManifest, formatExport, type ExportFilter, type ExportFormat } from "../config/exporters.js";
 import { parseManifestFile } from "../config/parser.js";
 import { commandExists, capture } from "../core/exec.js";
 import { assertMacOS, isMacOS } from "../core/platform.js";
@@ -23,6 +24,19 @@ interface MutatingOptions extends FileOptions {
 
 interface BrewfileOptions extends FileOptions {
   output?: string;
+}
+
+interface ExportOptions extends FileOptions {
+  output?: string;
+  onlyBrew?: boolean;
+  onlyNpm?: boolean;
+  onlyPnpm?: boolean;
+  onlyBun?: boolean;
+  onlyUv?: boolean;
+  brewfile?: boolean;
+  packageJson?: boolean;
+  requirementsTxt?: boolean;
+  manifest?: boolean;
 }
 
 export function createProgram(): Command {
@@ -78,21 +92,34 @@ export function createProgram(): Command {
     });
 
   program
+    .command("export")
+    .description("Export manifest entries in another format.")
+    .requiredOption("-f, --file <path>", "Manifest file")
+    .option("-o, --output <path>", "Write export to path")
+    .option("--only-brew", "Only include Homebrew tap/brew/cask/mas entries")
+    .option("--only-npm", "Only include npm entries")
+    .option("--only-pnpm", "Only include pnpm entries")
+    .option("--only-bun", "Only include bun entries")
+    .option("--only-uv", "Only include uv entries")
+    .option("--brewfile", "Export as Homebrew Brewfile")
+    .option("--package-json", "Export npm/pnpm/bun entries as package.json dependencies")
+    .option("--requirements-txt", "Export uv tool package names as requirements.txt")
+    .option("--manifest", "Export as macpack manifest")
+    .action(async (options: ExportOptions) => {
+      const manifest = await parseManifestFile(resolve(options.file));
+      const filtered = filterManifest(manifest, exportFilter(options));
+      const content = formatExport(filtered, exportFormat(options));
+      await writeOrPrint(content, options.output);
+    });
+
+  program
     .command("brewfile")
     .description("Generate a Homebrew Brewfile from the manifest.")
     .requiredOption("-f, --file <path>", "Manifest file")
     .option("-o, --output <path>", "Write Brewfile to path")
     .action(async (options: BrewfileOptions) => {
       const manifest = await parseManifestFile(resolve(options.file));
-      const brewfile = formatBrewfile(manifest);
-      if (options.output) {
-        const output = resolve(options.output);
-        await mkdir(dirname(output), { recursive: true });
-        await writeFile(output, brewfile, "utf8");
-        console.log(output);
-        return;
-      }
-      process.stdout.write(brewfile);
+      await writeOrPrint(formatBrewfile(manifest), options.output);
     });
 
   program
@@ -132,6 +159,42 @@ export function createProgram(): Command {
     });
 
   return program;
+}
+
+function exportFilter(options: ExportOptions): ExportFilter {
+  return {
+    brew: options.onlyBrew,
+    npm: options.onlyNpm,
+    pnpm: options.onlyPnpm,
+    bun: options.onlyBun,
+    uv: options.onlyUv,
+  };
+}
+
+function exportFormat(options: ExportOptions): ExportFormat {
+  const formats: ExportFormat[] = [];
+  if (options.brewfile) formats.push("brewfile");
+  if (options.packageJson) formats.push("package-json");
+  if (options.requirementsTxt) formats.push("requirements-txt");
+  if (options.manifest) formats.push("manifest");
+
+  if (formats.length > 1) {
+    throw new Error("Choose only one export format.");
+  }
+
+  return formats[0] ?? "manifest";
+}
+
+async function writeOrPrint(content: string, outputPath?: string): Promise<void> {
+  if (!outputPath) {
+    process.stdout.write(content);
+    return;
+  }
+
+  const output = resolve(outputPath);
+  await mkdir(dirname(output), { recursive: true });
+  await writeFile(output, content, "utf8");
+  console.log(output);
 }
 
 async function versionOrMissing(command: string, args: string[]): Promise<string> {

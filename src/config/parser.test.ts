@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatBrewfile } from "./brewfile.js";
+import { filterManifest, formatPackageJson, formatRequirementsTxt } from "./exporters.js";
 import { parseManifest } from "./parser.js";
 
 describe("parseManifest", () => {
@@ -41,5 +42,56 @@ describe("parseManifest", () => {
     `);
 
     expect(formatBrewfile(manifest)).toBe('tap "azure/functions"\nbrew "uv"\n');
+  });
+
+  it("exports node packages as package.json dependencies", () => {
+    const manifest = parseManifest(`
+      npm "tsx"
+      pnpm "serve"
+      bun "@johnlindquist/worktree"
+      uv "3.14" "serena-agent"
+    `);
+
+    expect(formatPackageJson(manifest)).toBe(
+      `${JSON.stringify(
+        {
+          dependencies: {
+            tsx: "latest",
+            serve: "latest",
+            "@johnlindquist/worktree": "latest",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  });
+
+  it("exports uv tools as requirements.txt package names", () => {
+    const manifest = parseManifest(`
+      uv "3.14" "nano-pdf"
+      uv "3.14" "serena-agent"
+    `);
+
+    expect(formatRequirementsTxt(manifest)).toBe("nano-pdf\nserena-agent\n");
+  });
+
+  it("filters sections before exporting", () => {
+    const manifest = parseManifest(`
+      brew "uv"
+      npm "tsx"
+      uv "3.14" "serena-agent"
+    `);
+
+    expect(filterManifest(manifest, { uv: true })).toEqual({
+      taps: [],
+      brews: [],
+      casks: [],
+      masApps: [],
+      npmPackages: [],
+      pnpmPackages: [],
+      bunPackages: [],
+      uvTools: [{ python: "3.14", packageName: "serena-agent" }],
+    });
   });
 });

@@ -34,6 +34,33 @@ Remove global packages/tools not present in the manifest. Managers with no entri
 
 Print a generated Homebrew Brewfile to stdout or write to `--output <path>`.
 
+## `export --file <path>`
+
+Export the manifest or filtered parts of it.
+
+Filters:
+
+- `--only-brew`
+- `--only-npm`
+- `--only-pnpm`
+- `--only-bun`
+- `--only-uv`
+
+Formats:
+
+- macpack manifest by default
+- `--brewfile`
+- `--package-json`
+- `--requirements-txt`
+
+Examples:
+
+```bash
+macpack export --file packages.macpack --only-brew --brewfile
+macpack export --file packages.macpack --package-json
+macpack export --file packages.macpack --only-uv --requirements-txt
+```
+
 ## `check --file <path>`
 
 Parse manifest and print section counts.

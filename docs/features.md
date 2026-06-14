@@ -7,6 +7,8 @@
 - Sync behavior: install missing packages, upgrade installed packages, and optionally remove entries no longer present in the manifest.
 - Safe manifest parser: no shell evaluation.
 - Buildable ESM CLI with npm `bin` entry for future npm/Homebrew distribution.
+- Export command for generating Brewfiles, package.json dependency blocks,
+  uv requirements-style files, or filtered macpack manifests.
 
 ## Non-goals
 
