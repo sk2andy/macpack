@@ -149,15 +149,6 @@ Only remove extras not present in the manifest:
 macpack cleanup --file examples/packages.macpack
 ```
 
-### `brewfile`
-
-Generate a Homebrew Brewfile from the Homebrew-only entries:
-
-```bash
-macpack brewfile --file examples/packages.macpack
-macpack brewfile --file examples/packages.macpack --output Brewfile
-```
-
 ### `export`
 
 Export the manifest, or selected managers, into another format:

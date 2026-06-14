@@ -2,7 +2,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { intro, log, outro } from "@clack/prompts";
 import { Command } from "commander";
-import { formatBrewfile } from "../config/brewfile.js";
 import { filterManifest, formatExport, type ExportFilter, type ExportFormat } from "../config/exporters.js";
 import { parseManifestFile } from "../config/parser.js";
 import { commandExists, capture } from "../core/exec.js";
@@ -20,10 +19,6 @@ interface MutatingOptions extends FileOptions {
   dryRun?: boolean;
   cleanup?: boolean;
   yes?: boolean;
-}
-
-interface BrewfileOptions extends FileOptions {
-  output?: string;
 }
 
 interface ExportOptions extends FileOptions {
@@ -107,19 +102,10 @@ export function createProgram(): Command {
     .option("--manifest", "Export as macpack manifest")
     .action(async (options: ExportOptions) => {
       const manifest = await parseManifestFile(resolve(options.file));
+      const format = exportFormat(options);
       const filtered = filterManifest(manifest, exportFilter(options));
-      const content = formatExport(filtered, exportFormat(options));
+      const content = formatExport(filtered, format);
       await writeOrPrint(content, options.output);
-    });
-
-  program
-    .command("brewfile")
-    .description("Generate a Homebrew Brewfile from the manifest.")
-    .requiredOption("-f, --file <path>", "Manifest file")
-    .option("-o, --output <path>", "Write Brewfile to path")
-    .action(async (options: BrewfileOptions) => {
-      const manifest = await parseManifestFile(resolve(options.file));
-      await writeOrPrint(formatBrewfile(manifest), options.output);
     });
 
   program

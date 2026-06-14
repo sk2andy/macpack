@@ -30,10 +30,6 @@ Install/update packages in the manifest. Use `--cleanup` to remove installed too
 
 Remove global packages/tools not present in the manifest. Managers with no entries are skipped, so an npm-only manifest does not require Homebrew.
 
-## `brewfile --file <path>`
-
-Print a generated Homebrew Brewfile to stdout or write to `--output <path>`.
-
 ## `export --file <path>`
 
 Export the manifest or filtered parts of it.

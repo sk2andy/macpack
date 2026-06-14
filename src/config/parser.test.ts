@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatBrewfile } from "./brewfile.js";
-import { filterManifest, formatPackageJson, formatRequirementsTxt } from "./exporters.js";
+import { filterManifest, formatExport, formatPackageJson, formatRequirementsTxt } from "./exporters.js";
 import { parseManifest } from "./parser.js";
 
 describe("parseManifest", () => {
