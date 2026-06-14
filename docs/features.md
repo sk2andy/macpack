@@ -2,6 +2,7 @@
 
 - One manifest for Homebrew taps, formulae, casks, MAS apps, npm/Volta tools, pnpm tools, bun tools, and uv tools.
 - Default manifest lookup via `./packages.macpack`, then `~/.config/macpack/packages.macpack`.
+- Optional setup prefill from currently installed packages.
 - Manifest editing via `add` and `remove`.
 - Interactive or `--all` upgrades via `upgrade`.
 - Interactive `setup` command for macOS bootstrap.

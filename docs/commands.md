@@ -22,6 +22,12 @@ Interactive bootstrap for macOS:
    - skip
 6. If uv is missing, ask whether to install it.
 7. Ask whether to create `~/.config/macpack/packages.macpack`.
+8. If yes, ask whether to prefill it from installed packages.
+
+Default manifest prefill collects Homebrew taps/formulae/casks, MAS apps, npm
+globals, Volta packages, pnpm globals, bun globals, and uv tools. Because
+`uv tool list` does not expose the Python version for tools, setup asks for one
+Python version and uses it for discovered uv entries.
 
 ## Manifest path default
 

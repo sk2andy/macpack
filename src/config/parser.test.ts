@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseMasList, parseUvToolList } from "./discovery.js";
 import { formatBrewfile } from "./brewfile.js";
 import { filterManifest, formatExport, formatPackageJson, formatRequirementsTxt } from "./exporters.js";
 import { addToManifest, removeFromManifest } from "./mutate.js";
@@ -138,5 +139,29 @@ describe("parseManifest", () => {
       bunPackages: [],
       uvTools: [],
     });
+  });
+
+  it("parses installed mas apps", () => {
+    expect(parseMasList("409183694 Keynote (14.4)\n497799835 Xcode (26.1)\n")).toEqual([
+      { id: "409183694", name: "Keynote" },
+      { id: "497799835", name: "Xcode" },
+    ]);
+  });
+
+  it("parses installed uv tools with a python fallback", () => {
+    expect(
+      parseUvToolList(
+        `
+          nano-pdf v0.2.1
+          - nano-pdf
+          serena-agent v1.5.3
+          - serena
+        `,
+        "3.14",
+      ),
+    ).toEqual([
+      { python: "3.14", packageName: "nano-pdf" },
+      { python: "3.14", packageName: "serena-agent" },
+    ]);
   });
 });

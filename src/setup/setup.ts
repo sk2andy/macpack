@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { cancel, confirm, intro, isCancel, note, outro, select, spinner, text } from "@clack/prompts";
 import { assertMacOS } from "../core/platform.js";
 import { commandExists, run } from "../core/exec.js";
-import { configManifestPath, ensureManifestFile, pathExists } from "../config/defaults.js";
+import { collectInstalledManifest } from "../config/discovery.js";
+import { configManifestPath, ensureManifestFile, pathExists, writeManifestFile } from "../config/defaults.js";
 
 type NodeInstallChoice = "volta" | "brew-node" | "nvm" | "skip";
 type BunInstallChoice = "official" | "brew" | "skip";
@@ -168,8 +169,17 @@ async function ensureDefaultManifest(options: { dryRun?: boolean }): Promise<voi
     return;
   }
 
-  await ensureManifestFile(manifestPath);
-  note(manifestPath, "Default manifest created");
+  const shouldPrefill = await askConfirm("Prefill it with currently installed packages?", true);
+  if (!shouldPrefill) {
+    await ensureManifestFile(manifestPath);
+    note(manifestPath, "Default manifest created");
+    return;
+  }
+
+  const uvPython = await askText("Python version for discovered uv tools", "3.14");
+  const manifest = await withSpinner("Collecting installed packages", () => collectInstalledManifest({ uvPython }));
+  await writeManifestFile(manifestPath, manifest);
+  note(manifestPath, "Default manifest created from installed packages");
 }
 
 async function installVolta(options: { dryRun?: boolean }): Promise<void> {

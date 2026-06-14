@@ -1,6 +1,8 @@
 import { access, mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { formatManifest } from "./exporters.js";
+import type { PackageManifest } from "../core/types.js";
 
 export const DEFAULT_MANIFEST_NAME = "packages.macpack";
 
@@ -23,6 +25,11 @@ export async function ensureManifestFile(path: string): Promise<void> {
   if (await pathExists(path)) return;
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, "", "utf8");
+}
+
+export async function writeManifestFile(path: string, manifest: PackageManifest): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, formatManifest(manifest), "utf8");
 }
 
 export async function pathExists(path: string): Promise<boolean> {

@@ -113,8 +113,9 @@ manifest in this order:
 1. `./packages.macpack` in the current directory, if it exists.
 2. `~/.config/macpack/packages.macpack`.
 
-`macpack setup` asks whether it should create the config default. `macpack add`
-also creates the target manifest if it does not exist.
+`macpack setup` asks whether it should create the config default. If yes, it
+also asks whether to prefill it from currently installed packages. `macpack add`
+creates the target manifest if it does not exist.
 
 ## Commands
 
@@ -146,6 +147,19 @@ The setup flow:
    - skip
 6. Installs uv if missing.
 7. Asks whether `~/.config/macpack/packages.macpack` should be created.
+8. If yes, asks whether it should be prefilled from installed packages.
+
+Prefill collects:
+
+- Homebrew taps, formula leaves, and casks
+- Mac App Store apps from `mas list`
+- npm globals and Volta packages
+- pnpm globals
+- bun globals from `~/.bun/install/global/package.json`
+- uv tools from `uv tool list`
+
+`uv tool list` does not expose the Python version used for each tool, so setup
+asks for a Python version and writes that value for discovered uv tools.
 
 ### `apply`
 

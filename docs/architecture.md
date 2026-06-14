@@ -27,8 +27,22 @@ macpack avoids broad `upgrade all globals` commands. Apply operations target pac
 
 Commands with `--file` accept an explicit manifest path. Without it, macpack
 uses `./packages.macpack` when present, otherwise
-`~/.config/macpack/packages.macpack`. Setup can create the config default, and
-`add` creates the resolved target on first write.
+`~/.config/macpack/packages.macpack`. Setup can create the config default,
+optionally prefill it from installed packages, and `add` creates the resolved
+target on first write.
+
+## Discovery Flow
+
+Setup prefill uses `src/config/discovery.ts` to collect installed packages:
+
+- `brew tap`, `brew leaves`, and `brew list --cask`
+- `mas list`
+- `npm ls -g --depth=0 --json` and `volta list all`
+- `pnpm list -g --depth=0 --json`
+- Bun's global `package.json`
+- `uv tool list`
+
+The collected manifest is deduped and sorted before writing.
 
 ## Upgrade Flow
 
