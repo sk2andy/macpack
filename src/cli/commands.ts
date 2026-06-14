@@ -1,18 +1,27 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { intro, log, outro } from "@clack/prompts";
+import { intro, isCancel, log, multiselect, outro, cancel } from "@clack/prompts";
 import { Command } from "commander";
+import { resolveManifestPath } from "../config/defaults.js";
 import { filterManifest, formatExport, type ExportFilter, type ExportFormat } from "../config/exporters.js";
+import { addEntries, removeEntries, type ManifestEntryKind } from "../config/mutate.js";
 import { parseManifestFile } from "../config/parser.js";
 import { commandExists, capture } from "../core/exec.js";
 import { assertMacOS, isMacOS } from "../core/platform.js";
 import { applyAll, cleanupAll } from "../installers/index.js";
 import { doctorBrew } from "../installers/brew.js";
 import { runSetup } from "../setup/setup.js";
+import {
+  applyUpgradeCandidates,
+  collectUpgradeCandidates,
+  manifestForManagers,
+  selectedManagers,
+  type UpgradeCandidate,
+} from "../upgrades/upgrade.js";
 import { VERSION } from "../version.js";
 
 interface FileOptions {
-  file: string;
+  file?: string;
 }
 
 interface MutatingOptions extends FileOptions {
@@ -34,6 +43,17 @@ interface ExportOptions extends FileOptions {
   manifest?: boolean;
 }
 
+interface AddOptions extends FileOptions {
+  python?: string;
+  id?: string;
+}
+
+interface UpgradeOptions extends FileOptions {
+  all?: boolean;
+  dryRun?: boolean;
+  yes?: boolean;
+}
+
 export function createProgram(): Command {
   const program = new Command();
 
@@ -53,14 +73,15 @@ export function createProgram(): Command {
   program
     .command("apply")
     .description("Install/update all packages from a manifest.")
-    .requiredOption("-f, --file <path>", "Manifest file")
+    .option("-f, --file <path>", "Manifest file")
     .option("--cleanup", "Remove installed tools not present in manifest")
     .option("-y, --yes", "Answer yes to trust prompts")
     .option("--dry-run", "Print commands without running them")
     .action(async (options: MutatingOptions) => {
       assertMacOS();
       intro("macpack apply");
-      const manifest = await parseManifestFile(resolve(options.file));
+      const file = await resolveManifestPath(options.file);
+      const manifest = await parseManifestFile(file);
       await applyAll(manifest, {
         cleanup: options.cleanup,
         dryRun: options.dryRun,
@@ -72,13 +93,14 @@ export function createProgram(): Command {
   program
     .command("cleanup")
     .description("Remove installed global packages/tools not present in manifest.")
-    .requiredOption("-f, --file <path>", "Manifest file")
+    .option("-f, --file <path>", "Manifest file")
     .option("-y, --yes", "Assume yes where a prompt is needed")
     .option("--dry-run", "Print commands without running them")
     .action(async (options: MutatingOptions) => {
       assertMacOS();
       intro("macpack cleanup");
-      const manifest = await parseManifestFile(resolve(options.file));
+      const file = await resolveManifestPath(options.file);
+      const manifest = await parseManifestFile(file);
       await cleanupAll(manifest, {
         dryRun: options.dryRun,
         yes: options.yes,
@@ -87,9 +109,82 @@ export function createProgram(): Command {
     });
 
   program
+    .command("add")
+    .description("Add entries to a manifest.")
+    .argument("<kind>", "tap, brew, cask, mas, npm, pnpm, bun, or uv")
+    .argument("<packages...>", "Package names, uv specs, or one mas app name")
+    .option("-f, --file <path>", "Manifest file")
+    .option("-p, --python <version>", "Python version for uv entries")
+    .option("--id <app-id>", "Mac App Store app id for mas entries")
+    .action(async (kind: ManifestEntryKind, packages: string[], options: AddOptions) => {
+      const file = await resolveManifestPath(options.file);
+      const result = await addEntries(file, normalizeKind(kind), packages, {
+        python: options.python,
+        masId: options.id,
+      });
+      log.success(`Added ${result.added ?? 0} entr${result.added === 1 ? "y" : "ies"} to ${result.path}`);
+    });
+
+  program
+    .command("remove")
+    .alias("rm")
+    .description("Remove entries from a manifest.")
+    .argument("<kind>", "tap, brew, cask, mas, npm, pnpm, bun, or uv")
+    .argument("<packages...>", "Package names, uv package names, mas ids, or mas names")
+    .option("-f, --file <path>", "Manifest file")
+    .action(async (kind: ManifestEntryKind, packages: string[], options: FileOptions) => {
+      const file = await resolveManifestPath(options.file);
+      const result = await removeEntries(file, normalizeKind(kind), packages);
+      log.success(`Removed ${result.removed ?? 0} entr${result.removed === 1 ? "y" : "ies"} from ${result.path}`);
+    });
+
+  program
+    .command("upgrade")
+    .description("Find and install newer versions for manifest entries.")
+    .argument("[manager]", "brew, npm, pnpm, bun, uv, or all", "all")
+    .option("-f, --file <path>", "Manifest file")
+    .option("--all", "Upgrade/install all matching manifest entries without prompting")
+    .option("-y, --yes", "Answer yes to trust prompts")
+    .option("--dry-run", "Print commands without running them")
+    .action(async (manager: string, options: UpgradeOptions) => {
+      assertMacOS();
+      intro("macpack upgrade");
+      const file = await resolveManifestPath(options.file);
+      const manifest = await parseManifestFile(file);
+      const managers = selectedManagers(manager);
+
+      if (options.all) {
+        await applyAll(manifestForManagers(manifest, managers), {
+          dryRun: options.dryRun,
+          yes: options.yes,
+        });
+        outro("Upgrade complete.");
+        return;
+      }
+
+      const candidates = await collectUpgradeCandidates(manifest, managers, { dryRun: options.dryRun });
+      if (candidates.length === 0) {
+        outro("No upgrades found.");
+        return;
+      }
+
+      const selected = await selectUpgradeCandidates(candidates);
+      if (selected.length === 0) {
+        outro("No upgrades selected.");
+        return;
+      }
+
+      await applyUpgradeCandidates(selected, {
+        dryRun: options.dryRun,
+        yes: options.yes,
+      });
+      outro("Upgrade complete.");
+    });
+
+  program
     .command("export")
     .description("Export manifest entries in another format.")
-    .requiredOption("-f, --file <path>", "Manifest file")
+    .option("-f, --file <path>", "Manifest file")
     .option("-o, --output <path>", "Write export to path")
     .option("--only-brew", "Only include Homebrew tap/brew/cask/mas entries")
     .option("--only-npm", "Only include npm entries")
@@ -101,7 +196,8 @@ export function createProgram(): Command {
     .option("--requirements-txt", "Export uv tool package names as requirements.txt")
     .option("--manifest", "Export as macpack manifest")
     .action(async (options: ExportOptions) => {
-      const manifest = await parseManifestFile(resolve(options.file));
+      const file = await resolveManifestPath(options.file);
+      const manifest = await parseManifestFile(file);
       const format = exportFormat(options);
       const filtered = filterManifest(manifest, exportFilter(options));
       const content = formatExport(filtered, format);
@@ -111,9 +207,10 @@ export function createProgram(): Command {
   program
     .command("check")
     .description("Parse manifest and print package counts.")
-    .requiredOption("-f, --file <path>", "Manifest file")
+    .option("-f, --file <path>", "Manifest file")
     .action(async (options: FileOptions) => {
-      const manifest = await parseManifestFile(resolve(options.file));
+      const file = await resolveManifestPath(options.file);
+      const manifest = await parseManifestFile(file);
       console.table({
         taps: manifest.taps.length,
         brews: manifest.brews.length,
@@ -145,6 +242,33 @@ export function createProgram(): Command {
     });
 
   return program;
+}
+
+function normalizeKind(kind: string): ManifestEntryKind {
+  if (["tap", "brew", "cask", "mas", "npm", "pnpm", "bun", "uv"].includes(kind)) {
+    return kind as ManifestEntryKind;
+  }
+  throw new Error(`Unsupported entry kind "${kind}". Use tap, brew, cask, mas, npm, pnpm, bun, or uv.`);
+}
+
+async function selectUpgradeCandidates(candidates: UpgradeCandidate[]): Promise<UpgradeCandidate[]> {
+  const selectedIds = await multiselect({
+    message: "Select upgrades to install",
+    required: false,
+    options: candidates.map((candidate) => ({
+      value: candidate.id,
+      label: `${candidate.kind} ${candidate.name}`,
+      hint: `${candidate.current} -> ${candidate.latest}`,
+    })),
+  });
+
+  if (isCancel(selectedIds)) {
+    cancel("Cancelled.");
+    process.exit(130);
+  }
+
+  const ids = new Set(selectedIds as string[]);
+  return candidates.filter((candidate) => ids.has(candidate.id));
 }
 
 function exportFilter(options: ExportOptions): ExportFilter {

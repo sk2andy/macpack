@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { formatBrewfile } from "./brewfile.js";
 import { filterManifest, formatExport, formatPackageJson, formatRequirementsTxt } from "./exporters.js";
+import { addToManifest, removeFromManifest } from "./mutate.js";
 import { parseManifest } from "./parser.js";
+import { manifestForManagers, selectedManagers } from "../upgrades/upgrade.js";
 
 describe("parseManifest", () => {
   it("parses all supported package kinds", () => {
@@ -92,6 +94,49 @@ describe("parseManifest", () => {
       pnpmPackages: [],
       bunPackages: [],
       uvTools: [{ python: "3.14", packageName: "serena-agent" }],
+    });
+  });
+
+  it("adds and removes manifest entries by kind", () => {
+    const manifest = parseManifest(`
+      brew "uv"
+      npm "tsx"
+      uv "3.13" "serena-agent"
+    `);
+
+    expect(addToManifest(manifest, "brew", ["gh", "uv"])).toBe(1);
+    expect(addToManifest(manifest, "uv", ["serena-agent", "ruff==0.6.0"], { python: "3.14" })).toBe(1);
+    expect(removeFromManifest(manifest, "npm", ["tsx"])).toBe(1);
+
+    expect(manifest.brews).toEqual(["uv", "gh"]);
+    expect(manifest.npmPackages).toEqual([]);
+    expect(manifest.uvTools).toEqual([
+      { python: "3.14", packageName: "serena-agent" },
+      { python: "3.14", packageName: "ruff==0.6.0" },
+    ]);
+  });
+
+  it("selects manifest sections for upgrade managers", () => {
+    const manifest = parseManifest(`
+      tap "azure/functions"
+      brew "uv"
+      cask "postman"
+      mas "Keynote" "409183694"
+      npm "tsx"
+      pnpm "serve"
+      bun "@johnlindquist/worktree"
+      uv "3.14" "serena-agent"
+    `);
+
+    expect(manifestForManagers(manifest, selectedManagers("brew"))).toEqual({
+      taps: ["azure/functions"],
+      brews: ["uv"],
+      casks: ["postman"],
+      masApps: [{ name: "Keynote", id: "409183694" }],
+      npmPackages: [],
+      pnpmPackages: [],
+      bunPackages: [],
+      uvTools: [],
     });
   });
 });

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { cancel, confirm, intro, isCancel, note, outro, select, spinner, text } from "@clack/prompts";
 import { assertMacOS } from "../core/platform.js";
 import { commandExists, run } from "../core/exec.js";
+import { configManifestPath, ensureManifestFile, pathExists } from "../config/defaults.js";
 
 type NodeInstallChoice = "volta" | "brew-node" | "nvm" | "skip";
 type BunInstallChoice = "official" | "brew" | "skip";
@@ -18,6 +19,7 @@ export async function runSetup(options: { dryRun?: boolean } = {}): Promise<void
   await ensureBun(options);
   await ensurePython(options);
   await ensureUv(options);
+  await ensureDefaultManifest(options);
 
   outro("Setup complete.");
 }
@@ -152,6 +154,22 @@ async function ensureUv(options: { dryRun?: boolean }): Promise<void> {
     case "skip":
       break;
   }
+}
+
+async function ensureDefaultManifest(options: { dryRun?: boolean }): Promise<void> {
+  const manifestPath = configManifestPath();
+  if (await pathExists(manifestPath)) return;
+
+  const shouldCreate = await askConfirm(`Create default manifest at ${manifestPath}?`, true);
+  if (!shouldCreate) return;
+
+  if (options.dryRun) {
+    note(manifestPath, "Would create default manifest");
+    return;
+  }
+
+  await ensureManifestFile(manifestPath);
+  note(manifestPath, "Default manifest created");
 }
 
 async function installVolta(options: { dryRun?: boolean }): Promise<void> {

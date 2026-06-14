@@ -1,6 +1,9 @@
 # Features
 
 - One manifest for Homebrew taps, formulae, casks, MAS apps, npm/Volta tools, pnpm tools, bun tools, and uv tools.
+- Default manifest lookup via `./packages.macpack`, then `~/.config/macpack/packages.macpack`.
+- Manifest editing via `add` and `remove`.
+- Interactive or `--all` upgrades via `upgrade`.
 - Interactive `setup` command for macOS bootstrap.
 - macOS-only runtime check before setup/apply operations.
 - Homebrew trust prompts for non-official taps when `HOMEBREW_REQUIRE_TAP_TRUST` is active.

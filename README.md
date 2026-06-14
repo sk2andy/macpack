@@ -10,6 +10,10 @@ It is designed for personal machine bootstrap and repeatable workstation setup.
 
 - One line-oriented manifest for `tap`, `brew`, `cask`, `mas`, `npm`, `pnpm`,
   `bun`, and `uv`.
+- Default manifest lookup: `./packages.macpack` first, then
+  `~/.config/macpack/packages.macpack`.
+- `add` and `remove` commands for editing manifest entries.
+- `upgrade` command with interactive package selection or `--all`.
 - Interactive `setup` command built with `@clack/prompts`.
 - macOS-only guard for mutating commands.
 - Homebrew tap trust prompts before installing from non-official taps.
@@ -91,6 +95,27 @@ brew "gh"
 brew "fzf"
 ```
 
+Versioned specs are passed through to the underlying manager where that manager
+supports them:
+
+```sh
+npm "typescript@5.9.3"
+pnpm "serve@14"
+bun "prettier@3.7.4"
+uv "3.14" "ruff==0.14.8"
+```
+
+## Default Manifest
+
+Every command that accepts `--file` can run without it. macpack resolves the
+manifest in this order:
+
+1. `./packages.macpack` in the current directory, if it exists.
+2. `~/.config/macpack/packages.macpack`.
+
+`macpack setup` asks whether it should create the config default. `macpack add`
+also creates the target manifest if it does not exist.
+
 ## Commands
 
 ### `setup`
@@ -120,6 +145,7 @@ The setup flow:
    - Homebrew Python
    - skip
 6. Installs uv if missing.
+7. Asks whether `~/.config/macpack/packages.macpack` should be created.
 
 ### `apply`
 
@@ -127,6 +153,7 @@ Install or update packages in the manifest:
 
 ```bash
 macpack apply --file examples/packages.macpack
+macpack apply
 ```
 
 Remove packages that are installed but no longer listed:
@@ -141,12 +168,66 @@ Preview commands without making changes:
 macpack apply --file examples/packages.macpack --dry-run
 ```
 
+### `add`
+
+Add entries to a manifest:
+
+```bash
+macpack add brew gh
+macpack add cask postman
+macpack add npm typescript@5.9.3 tsx
+macpack add pnpm serve
+macpack add bun @johnlindquist/worktree
+macpack add uv --python 3.14 serena-agent
+macpack add mas --id 409183694 Keynote
+```
+
+Use `--file <path>` to edit a specific manifest. Without `--file`, macpack uses
+the default manifest lookup.
+
+### `remove`
+
+Remove entries from a manifest:
+
+```bash
+macpack remove brew gh
+macpack remove npm tsx
+macpack remove uv serena-agent
+macpack remove mas 409183694
+```
+
+This edits the file only. Run `macpack apply --cleanup` or `macpack cleanup` to
+remove installed packages no longer listed.
+
+### `upgrade`
+
+Find newer versions for entries in the manifest and select what to install:
+
+```bash
+macpack upgrade
+macpack upgrade brew
+macpack upgrade npm
+macpack upgrade uv
+```
+
+Upgrade/install everything in the selected scope without prompts:
+
+```bash
+macpack upgrade --all
+macpack upgrade bun --all
+```
+
+With `--all`, macpack applies the matching manifest section directly, so missing
+entries are installed and installed entries are refreshed to the newest version
+allowed by their manifest spec.
+
 ### `cleanup`
 
 Only remove extras not present in the manifest:
 
 ```bash
 macpack cleanup --file examples/packages.macpack
+macpack cleanup
 ```
 
 ### `export`
@@ -155,6 +236,7 @@ Export the manifest, or selected managers, into another format:
 
 ```bash
 macpack export --file examples/packages.macpack
+macpack export
 macpack export --file examples/packages.macpack --only-brew --brewfile
 macpack export --file examples/packages.macpack --package-json
 macpack export --file examples/packages.macpack --only-uv --requirements-txt
@@ -181,6 +263,7 @@ Parse the manifest and print counts:
 
 ```bash
 macpack check --file examples/packages.macpack
+macpack check
 ```
 
 ### `doctor`
@@ -217,10 +300,11 @@ Release with those assets.
 ```text
 src/
   cli/         command definitions
-  config/      manifest parser and Brewfile formatter
+  config/      manifest parser, formatter, defaults, and mutations
   core/        process execution, prompts, platform checks, shared types
   installers/  one installer per package ecosystem
   setup/       interactive bootstrap flow
+  upgrades/    outdated detection and upgrade selection
 docs/          architecture, command, and feature notes
 examples/      example macpack manifest
 ```
