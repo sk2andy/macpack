@@ -243,6 +243,33 @@ macpack remove mas 409183694
 This edits the file only. Run `macpack apply --cleanup` or `macpack cleanup` to
 remove installed packages no longer listed.
 
+### `list`
+
+Print manifest entries:
+
+```bash
+macpack list
+macpack ls -g
+macpack list --only-brew
+```
+
+`list` supports the same default lookup, `-f/--file`, `-g/--global`, and
+`--only-*` filters as `export`.
+
+### `edit`
+
+Open the manifest in your editor:
+
+```bash
+macpack edit
+macpack edit -g
+macpack edit -f examples/packages.macpack
+```
+
+`edit` uses `$VISUAL`, then `$EDITOR`, then macOS `open -t`. If no manifest
+exists, it creates `./packages.macpack`; with `-g`, it creates the global config
+manifest.
+
 ### `upgrade`
 
 Find newer versions for entries in the manifest and select what to install:

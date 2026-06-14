@@ -2,11 +2,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { intro, isCancel, log, multiselect, outro, cancel } from "@clack/prompts";
 import { Command } from "commander";
-import { configManifestPath, localManifestPath, pathExists, resolveManifestPath } from "../config/defaults.js";
+import { configManifestPath, ensureManifestFile, localManifestPath, pathExists, resolveManifestPath } from "../config/defaults.js";
 import { filterManifest, formatExport, type ExportFilter, type ExportFormat } from "../config/exporters.js";
 import { addEntries, removeEntries, type ManifestEntryKind } from "../config/mutate.js";
 import { parseManifestFile } from "../config/parser.js";
-import { commandExists, capture } from "../core/exec.js";
+import { commandExists, capture, run, shellEscape } from "../core/exec.js";
 import { assertMacOS, isMacOS } from "../core/platform.js";
 import { applyAll, cleanupAll } from "../installers/index.js";
 import { doctorBrew } from "../installers/brew.js";
@@ -43,6 +43,14 @@ interface ExportOptions extends FileOptions {
   packageJson?: boolean;
   requirementsTxt?: boolean;
   manifest?: boolean;
+}
+
+interface ListOptions extends FileOptions {
+  onlyBrew?: boolean;
+  onlyNpm?: boolean;
+  onlyPnpm?: boolean;
+  onlyBun?: boolean;
+  onlyUv?: boolean;
 }
 
 interface AddOptions extends FileOptions {
@@ -147,6 +155,36 @@ export function createProgram(): Command {
       const file = await resolveManifestPath(options.file, { global: options.global });
       const result = await removeEntries(file, normalizeKind(kind), packages);
       log.success(`Removed ${result.removed ?? 0} entr${result.removed === 1 ? "y" : "ies"} from ${result.path}`);
+    });
+
+  program
+    .command("list")
+    .alias("ls")
+    .description("List manifest entries.")
+    .option("-f, --file <path>", "Manifest file")
+    .option("-g, --global", "Use the global config manifest")
+    .option("--only-brew", "Only include Homebrew tap/brew/cask/mas entries")
+    .option("--only-npm", "Only include npm entries")
+    .option("--only-pnpm", "Only include pnpm entries")
+    .option("--only-bun", "Only include bun entries")
+    .option("--only-uv", "Only include uv entries")
+    .action(async (options: ListOptions) => {
+      const file = await resolveManifestPath(options.file, { global: options.global });
+      const manifest = await parseManifestFile(file);
+      const filtered = filterManifest(manifest, exportFilter(options));
+      process.stdout.write(formatExport(filtered, "manifest"));
+    });
+
+  program
+    .command("edit")
+    .description("Open the manifest in the default editor.")
+    .option("-f, --file <path>", "Manifest file")
+    .option("-g, --global", "Use or create the global config manifest")
+    .action(async (options: FileOptions) => {
+      const file = await resolveWritableManifestPath(options.file, { global: options.global });
+      await ensureManifestFile(file);
+      log.info(`Opening ${file}`);
+      await openEditor(file);
     });
 
   program
@@ -274,6 +312,16 @@ async function resolveWritableManifestPath(file?: string, options: { global?: bo
 
   log.info(`No manifest found. Creating ${local}`);
   return local;
+}
+
+async function openEditor(file: string): Promise<void> {
+  const editor = process.env.VISUAL || process.env.EDITOR;
+  if (editor) {
+    await run("sh", ["-lc", `${editor} ${shellEscape(file)}`]);
+    return;
+  }
+
+  await run("open", ["-t", file]);
 }
 
 function normalizeKind(kind: string): ManifestEntryKind {

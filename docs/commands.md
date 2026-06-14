@@ -97,6 +97,40 @@ macpack remove uv serena-agent
 macpack remove mas 409183694
 ```
 
+## `list [--file <path>]`
+
+Print manifest entries in macpack manifest format.
+
+Examples:
+
+```bash
+macpack list
+macpack ls -g
+macpack list --only-brew
+```
+
+Supports `-f/--file`, `-g/--global`, and `--only-brew`, `--only-npm`,
+`--only-pnpm`, `--only-bun`, `--only-uv`.
+
+## `edit [--file <path>]`
+
+Open the manifest in an editor. Editor selection order:
+
+1. `$VISUAL`
+2. `$EDITOR`
+3. macOS `open -t`
+
+Examples:
+
+```bash
+macpack edit
+macpack edit -g
+macpack edit -f packages.macpack
+```
+
+If no manifest exists, `edit` creates `./packages.macpack`. With `-g`, it
+creates `~/.config/macpack/packages.macpack`.
+
 ## `upgrade [manager] [--file <path>]`
 
 Check manifest entries for newer versions and ask which ones to install.
