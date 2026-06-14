@@ -41,6 +41,17 @@ default exists, read commands fail with a clear error. `add` creates
 `./packages.macpack` with a log message unless `--global` or `--file` was
 passed.
 
+Shortcuts:
+
+- `-f, --file <path>`
+- `-g, --global`
+- `-n, --dry-run`
+- `-v, --verbose`
+- `-y, --yes`
+- `-a, --all`
+- `-p, --python <version>`
+- `-i, --id <app-id>`
+
 ## `apply [--file <path>]`
 
 Install/update packages in the manifest. Use `--cleanup` to remove installed tools not in the manifest. Managers with no entries are skipped.
@@ -68,10 +79,10 @@ Examples:
 
 ```bash
 macpack add brew gh
-macpack add --global brew gh
+macpack add -g brew gh
 macpack add npm typescript@5.9.3 tsx
-macpack add uv --python 3.14 serena-agent
-macpack add mas --id 409183694 Keynote
+macpack add uv -p 3.14 serena-agent
+macpack add mas -i 409183694 Keynote
 ```
 
 ## `remove <kind> <packages...> [--file <path>]`
@@ -104,8 +115,8 @@ Examples:
 ```bash
 macpack upgrade
 macpack upgrade brew
-macpack upgrade npm --all
-macpack upgrade uv --all
+macpack upgrade npm -a
+macpack upgrade uv -a
 ```
 
 `--all` skips prompts and applies the selected manifest section, installing missing entries and refreshing existing entries.

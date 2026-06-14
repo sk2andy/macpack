@@ -123,6 +123,17 @@ that file if it does not exist. Without `--file` or `--global`, `add` uses the
 default lookup and creates `./packages.macpack` with a log message if neither
 default exists.
 
+Common shortcuts:
+
+- `-f, --file <path>`
+- `-g, --global`
+- `-n, --dry-run`
+- `-v, --verbose`
+- `-y, --yes`
+- `-a, --all` for `upgrade`
+- `-p, --python <version>` for `add uv`
+- `-i, --id <app-id>` for `add mas`
+
 ## Commands
 
 ### `setup`
@@ -185,13 +196,13 @@ macpack apply --file examples/packages.macpack --cleanup
 Preview commands without making changes:
 
 ```bash
-macpack apply --file examples/packages.macpack --dry-run
+macpack apply -f examples/packages.macpack -n
 ```
 
 Stream full command output instead of collapsed step logs:
 
 ```bash
-macpack apply --verbose
+macpack apply -v
 ```
 
 ### `add`
@@ -204,8 +215,8 @@ macpack add cask postman
 macpack add npm typescript@5.9.3 tsx
 macpack add pnpm serve
 macpack add bun @johnlindquist/worktree
-macpack add uv --python 3.14 serena-agent
-macpack add mas --id 409183694 Keynote
+macpack add uv -p 3.14 serena-agent
+macpack add mas -i 409183694 Keynote
 ```
 
 Use `--file <path>` to edit a specific manifest. Without `--file`, macpack uses
@@ -215,7 +226,7 @@ the default manifest lookup. If neither default exists, `add` creates
 Use `--global` to edit `~/.config/macpack/packages.macpack` directly:
 
 ```bash
-macpack add --global brew gh
+macpack add -g brew gh
 ```
 
 ### `remove`
@@ -246,8 +257,8 @@ macpack upgrade uv
 Upgrade/install everything in the selected scope without prompts:
 
 ```bash
-macpack upgrade --all
-macpack upgrade bun --all
+macpack upgrade -a
+macpack upgrade bun -a
 ```
 
 With `--all`, macpack applies the matching manifest section directly, so missing

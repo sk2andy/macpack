@@ -68,7 +68,7 @@ export function createProgram(): Command {
   program
     .command("setup")
     .description("Interactive macOS bootstrap for Homebrew, Node.js, bun, Python, and uv.")
-    .option("--dry-run", "Print install commands without running them")
+    .option("-n, --dry-run", "Print install commands without running them")
     .action(async (options: { dryRun?: boolean }) => {
       await runSetup({ dryRun: options.dryRun });
     });
@@ -77,11 +77,11 @@ export function createProgram(): Command {
     .command("apply")
     .description("Install/update all packages from a manifest.")
     .option("-f, --file <path>", "Manifest file")
-    .option("--global", "Use the global config manifest")
+    .option("-g, --global", "Use the global config manifest")
     .option("--cleanup", "Remove installed tools not present in manifest")
     .option("-y, --yes", "Answer yes to trust prompts")
-    .option("--dry-run", "Print commands without running them")
-    .option("--verbose", "Stream command output instead of collapsing successful steps")
+    .option("-n, --dry-run", "Print commands without running them")
+    .option("-v, --verbose", "Stream command output instead of collapsing successful steps")
     .action(async (options: MutatingOptions) => {
       assertMacOS();
       intro("macpack apply");
@@ -100,10 +100,10 @@ export function createProgram(): Command {
     .command("cleanup")
     .description("Remove installed global packages/tools not present in manifest.")
     .option("-f, --file <path>", "Manifest file")
-    .option("--global", "Use the global config manifest")
+    .option("-g, --global", "Use the global config manifest")
     .option("-y, --yes", "Assume yes where a prompt is needed")
-    .option("--dry-run", "Print commands without running them")
-    .option("--verbose", "Stream command output instead of collapsing successful steps")
+    .option("-n, --dry-run", "Print commands without running them")
+    .option("-v, --verbose", "Stream command output instead of collapsing successful steps")
     .action(async (options: MutatingOptions) => {
       assertMacOS();
       intro("macpack cleanup");
@@ -123,9 +123,9 @@ export function createProgram(): Command {
     .argument("<kind>", "tap, brew, cask, mas, npm, pnpm, bun, or uv")
     .argument("<packages...>", "Package names, uv specs, or one mas app name")
     .option("-f, --file <path>", "Manifest file")
-    .option("--global", "Use or create the global config manifest")
+    .option("-g, --global", "Use or create the global config manifest")
     .option("-p, --python <version>", "Python version for uv entries")
-    .option("--id <app-id>", "Mac App Store app id for mas entries")
+    .option("-i, --id <app-id>", "Mac App Store app id for mas entries")
     .action(async (kind: ManifestEntryKind, packages: string[], options: AddOptions) => {
       const file = await resolveWritableManifestPath(options.file, { global: options.global });
       const result = await addEntries(file, normalizeKind(kind), packages, {
@@ -142,7 +142,7 @@ export function createProgram(): Command {
     .argument("<kind>", "tap, brew, cask, mas, npm, pnpm, bun, or uv")
     .argument("<packages...>", "Package names, uv package names, mas ids, or mas names")
     .option("-f, --file <path>", "Manifest file")
-    .option("--global", "Use the global config manifest")
+    .option("-g, --global", "Use the global config manifest")
     .action(async (kind: ManifestEntryKind, packages: string[], options: FileOptions) => {
       const file = await resolveManifestPath(options.file, { global: options.global });
       const result = await removeEntries(file, normalizeKind(kind), packages);
@@ -154,11 +154,11 @@ export function createProgram(): Command {
     .description("Find and install newer versions for manifest entries.")
     .argument("[manager]", "brew, npm, pnpm, bun, uv, or all", "all")
     .option("-f, --file <path>", "Manifest file")
-    .option("--global", "Use the global config manifest")
-    .option("--all", "Upgrade/install all matching manifest entries without prompting")
+    .option("-g, --global", "Use the global config manifest")
+    .option("-a, --all", "Upgrade/install all matching manifest entries without prompting")
     .option("-y, --yes", "Answer yes to trust prompts")
-    .option("--dry-run", "Print commands without running them")
-    .option("--verbose", "Stream command output instead of collapsing successful steps")
+    .option("-n, --dry-run", "Print commands without running them")
+    .option("-v, --verbose", "Stream command output instead of collapsing successful steps")
     .action(async (manager: string, options: UpgradeOptions) => {
       assertMacOS();
       intro("macpack upgrade");
@@ -200,7 +200,7 @@ export function createProgram(): Command {
     .command("export")
     .description("Export manifest entries in another format.")
     .option("-f, --file <path>", "Manifest file")
-    .option("--global", "Use the global config manifest")
+    .option("-g, --global", "Use the global config manifest")
     .option("-o, --output <path>", "Write export to path")
     .option("--only-brew", "Only include Homebrew tap/brew/cask/mas entries")
     .option("--only-npm", "Only include npm entries")
@@ -224,7 +224,7 @@ export function createProgram(): Command {
     .command("check")
     .description("Parse manifest and print package counts.")
     .option("-f, --file <path>", "Manifest file")
-    .option("--global", "Use the global config manifest")
+    .option("-g, --global", "Use the global config manifest")
     .action(async (options: FileOptions) => {
       const file = await resolveManifestPath(options.file, { global: options.global });
       const manifest = await parseManifestFile(file);
