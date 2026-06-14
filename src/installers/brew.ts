@@ -1,6 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { log } from "@clack/prompts";
 import { confirmOrCancel } from "../core/prompts.js";
 import { capture, commandExists, run } from "../core/exec.js";
 import type { ApplyOptions, CleanupOptions, PackageManifest, RunOptions } from "../core/types.js";
@@ -33,14 +34,18 @@ export async function applyBrew(manifest: PackageManifest, options: ApplyOptions
   await ensureBrewAvailable();
   const env = await brewEnv(options.env);
 
+  log.info("Homebrew: ensuring taps");
   await ensureTaps(manifest.taps, { ...options, env });
   await promptForTapTrust(manifest.taps, options.yes ?? false, { ...options, env });
 
-  const brewfile = await writeTempBrewfile(manifest);
+  const skippedCasks = await installMissingCasksWithForce(manifest.casks, { ...options, env });
+  const effectiveManifest = skippedCasks.size > 0 ? withoutCasks(manifest, skippedCasks) : manifest;
+  const brewfile = await writeTempBrewfile(effectiveManifest);
   try {
-    await installMissingCasksWithForce(manifest.casks, { ...options, env });
+    log.info("Homebrew: running brew bundle");
     await run("brew", ["bundle", "--file", brewfile], { ...options, env });
     if (options.cleanup) {
+      log.info("Homebrew: running brew bundle cleanup");
       await cleanupBrew(manifest, { ...options, env });
     }
   } finally {
@@ -56,6 +61,7 @@ export async function cleanupBrew(manifest: PackageManifest, options: CleanupOpt
   const env = options.dryRun ? options.env : await brewEnv(options.env);
   const brewfile = await writeTempBrewfile(manifest);
   try {
+    log.info("Homebrew: running brew bundle cleanup");
     await run("brew", ["bundle", "cleanup", "--force", "--file", brewfile], { ...options, env });
   } finally {
     await rm(dirname(brewfile), { force: true, recursive: true });
@@ -84,7 +90,8 @@ async function brewEnv(env: NodeJS.ProcessEnv = {}): Promise<NodeJS.ProcessEnv> 
 }
 
 async function ensureTaps(taps: string[], options: RunOptions): Promise<void> {
-  for (const tap of taps) {
+  for (const [index, tap] of taps.entries()) {
+    log.info(`Homebrew tap ${index + 1}/${taps.length}: ${tap}`);
     const info = await capture("brew", ["tap-info", "--json", tap], options);
     if (info.exitCode === 0 && info.stdout.includes(`"installed": true`)) continue;
     await run("brew", ["tap", tap], options);
@@ -126,10 +133,44 @@ async function writeTempBrewfile(manifest: PackageManifest): Promise<string> {
   return path;
 }
 
-async function installMissingCasksWithForce(casks: string[], options: RunOptions): Promise<void> {
-  for (const cask of casks) {
+async function installMissingCasksWithForce(casks: string[], options: RunOptions): Promise<Set<string>> {
+  const skipped = new Set<string>();
+  if (casks.length === 0) return skipped;
+
+  log.info(`Homebrew: checking ${casks.length} casks`);
+  for (const [index, cask] of casks.entries()) {
+    log.info(`Homebrew cask ${index + 1}/${casks.length}: ${cask}`);
     const installed = await capture("brew", ["list", "--cask", "--versions", cask], options);
     if (installed.exitCode === 0) continue;
-    await run("brew", ["install", "--cask", "--force", cask], options);
+
+    const result = await capture("brew", ["install", "--cask", "--force", cask], options);
+    if (result.exitCode === 0) continue;
+
+    if (isUnavailableCask(result.stdout, result.stderr)) {
+      skipped.add(cask);
+      log.warn(`Skipping unavailable Homebrew cask "${cask}". Remove or rename it in your manifest.`);
+      continue;
+    }
+
+    throw new Error(commandFailure("brew install --cask --force", cask, result.stdout, result.stderr, result.exitCode));
   }
+
+  return skipped;
+}
+
+function withoutCasks(manifest: PackageManifest, skipped: Set<string>): PackageManifest {
+  return {
+    ...manifest,
+    casks: manifest.casks.filter((cask) => !skipped.has(cask)),
+  };
+}
+
+function isUnavailableCask(stdout: string, stderr: string): boolean {
+  const output = `${stdout}\n${stderr}`;
+  return /Cask '.*' is unavailable|No Cask with this name exists/i.test(output);
+}
+
+function commandFailure(command: string, name: string, stdout: string, stderr: string, exitCode: number): string {
+  const output = [stdout.trim(), stderr.trim()].filter(Boolean).join("\n");
+  return `${command} ${name} failed with exit code ${exitCode}${output ? `\n${output}` : ""}`;
 }
