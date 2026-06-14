@@ -21,6 +21,9 @@ It is designed for personal machine bootstrap and repeatable workstation setup.
   instead of running broad global upgrades.
 - Cleanup mode removes installed global packages/tools that are no longer in
   the manifest.
+- Collapsed apply logs: successful command output is hidden, warnings stay
+  visible, and failures print full command output. Use `--verbose` to stream all
+  output.
 - Build output is a normal Node executable with a `bin` entry for future npm and
   Homebrew distribution.
 
@@ -182,6 +185,12 @@ Preview commands without making changes:
 macpack apply --file examples/packages.macpack --dry-run
 ```
 
+Stream full command output instead of collapsed step logs:
+
+```bash
+macpack apply --verbose
+```
+
 ### `add`
 
 Add entries to a manifest:
@@ -235,6 +244,9 @@ With `--all`, macpack applies the matching manifest section directly, so missing
 entries are installed and installed entries are refreshed to the newest version
 allowed by their manifest spec.
 
+Use `--verbose` to stream package-manager output instead of collapsing
+successful steps.
+
 ### `cleanup`
 
 Only remove extras not present in the manifest:
@@ -243,6 +255,8 @@ Only remove extras not present in the manifest:
 macpack cleanup --file examples/packages.macpack
 macpack cleanup
 ```
+
+Use `--verbose` to stream cleanup command output.
 
 ### `export`
 

@@ -42,6 +42,10 @@ Commands with `--file` also work without it. Default lookup:
 
 Install/update packages in the manifest. Use `--cleanup` to remove installed tools not in the manifest. Managers with no entries are skipped.
 
+By default, successful command output is collapsed into step status lines.
+Warnings remain visible. Failures print full command output. Use `--verbose` to
+stream package-manager output.
+
 ## `add <kind> <packages...> [--file <path>]`
 
 Add entries to a manifest.
@@ -102,9 +106,13 @@ macpack upgrade uv --all
 
 `--all` skips prompts and applies the selected manifest section, installing missing entries and refreshing existing entries.
 
+Use `--verbose` to stream package-manager output.
+
 ## `cleanup [--file <path>]`
 
 Remove global packages/tools not present in the manifest. Managers with no entries are skipped, so an npm-only manifest does not require Homebrew.
+
+Use `--verbose` to stream package-manager output.
 
 ## `export [--file <path>]`
 

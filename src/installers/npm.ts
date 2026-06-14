@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { capture, commandExists, run } from "../core/exec.js";
+import { capture, commandExists, runStep } from "../core/exec.js";
 import type { ApplyOptions, CleanupOptions, PackageManifest } from "../core/types.js";
 
 export async function applyNpm(manifest: PackageManifest, options: ApplyOptions = {}): Promise<void> {
@@ -9,26 +9,26 @@ export async function applyNpm(manifest: PackageManifest, options: ApplyOptions 
   if (await commandExists("volta")) {
     for (const packageName of manifest.npmPackages) {
       log.info(`npm via Volta: installing ${packageName}`);
-      await run("volta", ["install", packageName], options);
+      await runStep(`npm via Volta: installing ${packageName}`, "volta", ["install", packageName], options);
     }
     return;
   }
 
   if (!(await commandExists("npm"))) throw new Error("npm is not installed. Run `macpack setup` first.");
   log.info(`npm: installing ${manifest.npmPackages.length} global packages`);
-  await run("npm", ["install", "-g", ...manifest.npmPackages], options);
+  await runStep("npm: installing global packages", "npm", ["install", "-g", ...manifest.npmPackages], options);
 }
 
 export async function cleanupNpm(manifest: PackageManifest, options: CleanupOptions = {}): Promise<void> {
   const keep = new Set(manifest.npmPackages);
   if (await commandExists("volta")) {
     for (const packageName of await installedVoltaPackages()) {
-      if (!keep.has(packageName)) await run("volta", ["uninstall", packageName], options);
+      if (!keep.has(packageName)) await runStep(`npm via Volta: uninstalling ${packageName}`, "volta", ["uninstall", packageName], options);
     }
   }
   if (await commandExists("npm")) {
     for (const packageName of await installedNpmPackages()) {
-      if (!keep.has(packageName)) await run("npm", ["uninstall", "-g", packageName], options);
+      if (!keep.has(packageName)) await runStep(`npm: uninstalling ${packageName}`, "npm", ["uninstall", "-g", packageName], options);
     }
   }
 }

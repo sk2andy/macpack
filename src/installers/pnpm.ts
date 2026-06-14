@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { capture, commandExists, run } from "../core/exec.js";
+import { capture, commandExists, runStep } from "../core/exec.js";
 import type { ApplyOptions, CleanupOptions, PackageManifest } from "../core/types.js";
 
 export async function applyPnpm(manifest: PackageManifest, options: ApplyOptions = {}): Promise<void> {
@@ -8,14 +8,14 @@ export async function applyPnpm(manifest: PackageManifest, options: ApplyOptions
   if (!(await commandExists("pnpm"))) throw new Error("pnpm is not installed. Add `npm \"pnpm\"` or run setup.");
 
   log.info(`pnpm: installing ${manifest.pnpmPackages.length} global packages`);
-  await run("pnpm", ["add", "-g", ...manifest.pnpmPackages], options);
+  await runStep("pnpm: installing global packages", "pnpm", ["add", "-g", ...manifest.pnpmPackages], options);
 }
 
 export async function cleanupPnpm(manifest: PackageManifest, options: CleanupOptions = {}): Promise<void> {
   if (!(await commandExists("pnpm"))) return;
   const keep = new Set(manifest.pnpmPackages);
   for (const packageName of await installedPnpmPackages()) {
-    if (!keep.has(packageName)) await run("pnpm", ["remove", "-g", packageName], options);
+    if (!keep.has(packageName)) await runStep(`pnpm: removing ${packageName}`, "pnpm", ["remove", "-g", packageName], options);
   }
 }
 

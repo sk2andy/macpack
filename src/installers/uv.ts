@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { capture, commandExists, run } from "../core/exec.js";
+import { capture, commandExists, runStep } from "../core/exec.js";
 import type { ApplyOptions, CleanupOptions, PackageManifest } from "../core/types.js";
 
 export async function applyUv(manifest: PackageManifest, options: ApplyOptions = {}): Promise<void> {
@@ -9,7 +9,14 @@ export async function applyUv(manifest: PackageManifest, options: ApplyOptions =
 
   for (const [index, tool] of manifest.uvTools.entries()) {
     log.info(`uv tool ${index + 1}/${manifest.uvTools.length}: ${tool.packageName} (${tool.python})`);
-    await run("uv", ["tool", "install", "--upgrade", "-p", tool.python, tool.packageName], options);
+    await runStep(`uv tool ${index + 1}/${manifest.uvTools.length}: ${tool.packageName}`, "uv", [
+      "tool",
+      "install",
+      "--upgrade",
+      "-p",
+      tool.python,
+      tool.packageName,
+    ], options);
   }
 }
 
@@ -17,7 +24,7 @@ export async function cleanupUv(manifest: PackageManifest, options: CleanupOptio
   if (!(await commandExists("uv"))) return;
   const keep = new Set(manifest.uvTools.map((tool) => tool.packageName));
   for (const packageName of await installedUvTools()) {
-    if (!keep.has(packageName)) await run("uv", ["tool", "uninstall", packageName], options);
+    if (!keep.has(packageName)) await runStep(`uv: uninstalling ${packageName}`, "uv", ["tool", "uninstall", packageName], options);
   }
 }
 

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { log } from "@clack/prompts";
 import { confirmOrCancel } from "../core/prompts.js";
-import { capture, commandExists, run } from "../core/exec.js";
+import { capture, captureStep, commandExists, runStep } from "../core/exec.js";
 import type { ApplyOptions, CleanupOptions, PackageManifest, RunOptions } from "../core/types.js";
 import { formatBrewfile } from "../config/brewfile.js";
 
@@ -21,9 +21,9 @@ export async function applyBrew(manifest: PackageManifest, options: ApplyOptions
   if (options.dryRun) {
     const brewfile = await writeTempBrewfile(manifest);
     try {
-      await run("brew", ["bundle", "--file", brewfile], options);
+      await runStep("Homebrew: running brew bundle", "brew", ["bundle", "--file", brewfile], options);
       if (options.cleanup) {
-        await run("brew", ["bundle", "cleanup", "--force", "--file", brewfile], options);
+        await runStep("Homebrew: running brew bundle cleanup", "brew", ["bundle", "cleanup", "--force", "--file", brewfile], options);
       }
     } finally {
       await rm(dirname(brewfile), { force: true, recursive: true });
@@ -42,8 +42,7 @@ export async function applyBrew(manifest: PackageManifest, options: ApplyOptions
   const effectiveManifest = skippedCasks.size > 0 ? withoutCasks(manifest, skippedCasks) : manifest;
   const brewfile = await writeTempBrewfile(effectiveManifest);
   try {
-    log.info("Homebrew: running brew bundle");
-    await run("brew", ["bundle", "--file", brewfile], { ...options, env });
+    await runStep("Homebrew: running brew bundle", "brew", ["bundle", "--file", brewfile], { ...options, env });
     if (options.cleanup) {
       log.info("Homebrew: running brew bundle cleanup");
       await cleanupBrew(manifest, { ...options, env });
@@ -61,8 +60,7 @@ export async function cleanupBrew(manifest: PackageManifest, options: CleanupOpt
   const env = options.dryRun ? options.env : await brewEnv(options.env);
   const brewfile = await writeTempBrewfile(manifest);
   try {
-    log.info("Homebrew: running brew bundle cleanup");
-    await run("brew", ["bundle", "cleanup", "--force", "--file", brewfile], { ...options, env });
+    await runStep("Homebrew: running brew bundle cleanup", "brew", ["bundle", "cleanup", "--force", "--file", brewfile], { ...options, env });
   } finally {
     await rm(dirname(brewfile), { force: true, recursive: true });
   }
@@ -94,7 +92,7 @@ async function ensureTaps(taps: string[], options: RunOptions): Promise<void> {
     log.info(`Homebrew tap ${index + 1}/${taps.length}: ${tap}`);
     const info = await capture("brew", ["tap-info", "--json", tap], options);
     if (info.exitCode === 0 && info.stdout.includes(`"installed": true`)) continue;
-    await run("brew", ["tap", tap], options);
+    await runStep(`Homebrew tap ${index + 1}/${taps.length}: ${tap}`, "brew", ["tap", tap], options);
   }
 }
 
@@ -103,7 +101,7 @@ async function promptForTapTrust(taps: string[], yes: boolean, options: RunOptio
   for (const tap of untrusted) {
     const shouldTrust = yes || (await confirmOrCancel(`Trust Homebrew tap "${tap}" before installing from it?`, true));
     if (shouldTrust) {
-      await run("brew", ["trust", "--tap", tap], options);
+      await runStep(`Homebrew: trusting tap ${tap}`, "brew", ["trust", "--tap", tap], options);
     }
   }
 }
@@ -143,7 +141,12 @@ async function installMissingCasksWithForce(casks: string[], options: RunOptions
     const installed = await capture("brew", ["list", "--cask", "--versions", cask], options);
     if (installed.exitCode === 0) continue;
 
-    const result = await capture("brew", ["install", "--cask", "--force", cask], options);
+    const result = await captureStep(`Homebrew cask ${index + 1}/${casks.length}: installing ${cask}`, "brew", [
+      "install",
+      "--cask",
+      "--force",
+      cask,
+    ], options);
     if (result.exitCode === 0) continue;
 
     if (isUnavailableCask(result.stdout, result.stderr)) {

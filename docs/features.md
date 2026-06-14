@@ -9,6 +9,7 @@
 - macOS-only runtime check before setup/apply operations.
 - Homebrew trust prompts for non-official taps when `HOMEBREW_REQUIRE_TAP_TRUST` is active.
 - Sync behavior: install missing packages, upgrade installed packages, and optionally remove entries no longer present in the manifest.
+- Collapsed apply/upgrade/cleanup logs with warnings and errors kept visible.
 - Safe manifest parser: no shell evaluation.
 - Buildable ESM CLI with npm `bin` entry for future npm/Homebrew distribution.
 - Export command for generating Brewfiles, package.json dependency blocks,

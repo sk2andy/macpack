@@ -26,6 +26,7 @@ export interface RunOptions {
   env?: NodeJS.ProcessEnv;
   cwd?: string;
   quiet?: boolean;
+  verbose?: boolean;
 }
 
 export interface ApplyOptions extends RunOptions {

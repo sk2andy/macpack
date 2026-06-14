@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { log } from "@clack/prompts";
-import { commandExists, run } from "../core/exec.js";
+import { commandExists, runStep } from "../core/exec.js";
 import type { ApplyOptions, CleanupOptions, PackageManifest } from "../core/types.js";
 
 export async function applyBun(manifest: PackageManifest, options: ApplyOptions = {}): Promise<void> {
@@ -11,14 +11,14 @@ export async function applyBun(manifest: PackageManifest, options: ApplyOptions 
   if (!(await commandExists("bun"))) throw new Error("bun is not installed. Run `macpack setup` first.");
 
   log.info(`bun: installing ${manifest.bunPackages.length} global packages`);
-  await run("bun", ["install", "-g", ...manifest.bunPackages], options);
+  await runStep("bun: installing global packages", "bun", ["install", "-g", ...manifest.bunPackages], options);
 }
 
 export async function cleanupBun(manifest: PackageManifest, options: CleanupOptions = {}): Promise<void> {
   if (!(await commandExists("bun"))) return;
   const keep = new Set(manifest.bunPackages);
   for (const packageName of await installedBunPackages()) {
-    if (!keep.has(packageName)) await run("bun", ["remove", "-g", packageName], options);
+    if (!keep.has(packageName)) await runStep(`bun: removing ${packageName}`, "bun", ["remove", "-g", packageName], options);
   }
 }
 

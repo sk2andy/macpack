@@ -28,6 +28,7 @@ interface MutatingOptions extends FileOptions {
   dryRun?: boolean;
   cleanup?: boolean;
   yes?: boolean;
+  verbose?: boolean;
 }
 
 interface ExportOptions extends FileOptions {
@@ -52,6 +53,7 @@ interface UpgradeOptions extends FileOptions {
   all?: boolean;
   dryRun?: boolean;
   yes?: boolean;
+  verbose?: boolean;
 }
 
 export function createProgram(): Command {
@@ -77,6 +79,7 @@ export function createProgram(): Command {
     .option("--cleanup", "Remove installed tools not present in manifest")
     .option("-y, --yes", "Answer yes to trust prompts")
     .option("--dry-run", "Print commands without running them")
+    .option("--verbose", "Stream command output instead of collapsing successful steps")
     .action(async (options: MutatingOptions) => {
       assertMacOS();
       intro("macpack apply");
@@ -86,6 +89,7 @@ export function createProgram(): Command {
         cleanup: options.cleanup,
         dryRun: options.dryRun,
         yes: options.yes,
+        verbose: options.verbose,
       });
       outro("Apply complete.");
     });
@@ -96,6 +100,7 @@ export function createProgram(): Command {
     .option("-f, --file <path>", "Manifest file")
     .option("-y, --yes", "Assume yes where a prompt is needed")
     .option("--dry-run", "Print commands without running them")
+    .option("--verbose", "Stream command output instead of collapsing successful steps")
     .action(async (options: MutatingOptions) => {
       assertMacOS();
       intro("macpack cleanup");
@@ -104,6 +109,7 @@ export function createProgram(): Command {
       await cleanupAll(manifest, {
         dryRun: options.dryRun,
         yes: options.yes,
+        verbose: options.verbose,
       });
       outro("Cleanup complete.");
     });
@@ -146,6 +152,7 @@ export function createProgram(): Command {
     .option("--all", "Upgrade/install all matching manifest entries without prompting")
     .option("-y, --yes", "Answer yes to trust prompts")
     .option("--dry-run", "Print commands without running them")
+    .option("--verbose", "Stream command output instead of collapsing successful steps")
     .action(async (manager: string, options: UpgradeOptions) => {
       assertMacOS();
       intro("macpack upgrade");
@@ -157,6 +164,7 @@ export function createProgram(): Command {
         await applyAll(manifestForManagers(manifest, managers), {
           dryRun: options.dryRun,
           yes: options.yes,
+          verbose: options.verbose,
         });
         outro("Upgrade complete.");
         return;
@@ -177,6 +185,7 @@ export function createProgram(): Command {
       await applyUpgradeCandidates(selected, {
         dryRun: options.dryRun,
         yes: options.yes,
+        verbose: options.verbose,
       });
       outro("Upgrade complete.");
     });
