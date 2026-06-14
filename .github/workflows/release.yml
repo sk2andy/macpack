@@ -61,6 +61,11 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release delete "$VERSION" --yes --cleanup-tag
+          else
+            git push origin ":refs/tags/$VERSION" 2>/dev/null || true
+          fi
           gh release create "$VERSION" build/assets/* \
             --target "$GITHUB_SHA" \
             --title "$VERSION" \
