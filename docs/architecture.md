@@ -47,8 +47,8 @@ repositories:
 - `pnpm list -g --depth=0 --json`
 - Bun's global `package.json`
 - `uv tool list`
-- optional home-folder git repository scan, skipping `worktree-directories` and
-  common cache/media folders
+- optional home-folder git repository scan, skipping `worktree-directories`,
+  `worktrees`, git worktree roots, and common cache/media folders
 
 Collected entries are merged into the global manifest, deduped, and sorted
 before writing.

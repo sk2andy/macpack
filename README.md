@@ -180,7 +180,8 @@ Package scans collect:
 - bun globals from `~/.bun/install/global/package.json`
 - uv tools from `uv tool list`
 - git repositories under the home folder when enabled, skipping
-  `worktree-directories` and common cache/media folders
+  `worktree-directories`, `worktrees`, git worktree roots, and common
+  cache/media folders
 
 `uv tool list` does not expose the Python version used for each tool, so setup
 asks for a Python version and writes that value for discovered uv tools.

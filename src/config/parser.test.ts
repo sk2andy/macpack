@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -184,8 +184,12 @@ describe("parseManifest", () => {
     const root = await mkdtempInTmp("macpack-repos-");
     const repo = join(root, "workspace", "macpack");
     const skippedRepo = join(root, "worktree-directories", "ignored");
+    const skippedWorktreesRepo = join(root, ".codex", "worktrees", "ignored");
+    const gitWorktree = join(root, "workspace", "feature-worktree");
     await initTestRepo(repo, "https://github.com/sk2andy/macpack.git");
     await initTestRepo(skippedRepo, "https://github.com/sk2andy/ignored.git");
+    await initTestRepo(skippedWorktreesRepo, "https://github.com/sk2andy/worktrees-ignored.git");
+    await initTestWorktree(gitWorktree);
 
     await expect(collectGitRepositories(root)).resolves.toEqual([
       { url: "https://github.com/sk2andy/macpack.git", targetDir: repo },
@@ -202,4 +206,9 @@ async function initTestRepo(path: string, url: string): Promise<void> {
   await mkdir(path, { recursive: true });
   await run("git", ["init"], { cwd: path, quiet: true });
   await run("git", ["remote", "add", "origin", url], { cwd: path, quiet: true });
+}
+
+async function initTestWorktree(path: string): Promise<void> {
+  await mkdir(path, { recursive: true });
+  await writeFile(join(path, ".git"), "gitdir: /tmp/macpack-worktree/.git/worktrees/feature\n", "utf8");
 }

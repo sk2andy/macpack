@@ -25,6 +25,7 @@ const REPO_SCAN_SKIP_DIRECTORIES = new Set([
   ".rustup",
   "node_modules",
   "worktree-directories",
+  "worktrees",
 ]);
 
 export async function collectInstalledManifest(options: DiscoveryOptions = {}): Promise<PackageManifest> {
@@ -205,10 +206,12 @@ async function walkForGitRepos(rootDir: string, onRepo: (targetDir: string) => P
     return;
   }
 
-  if (entries.some((entry) => entry.name === ".git")) {
+  const gitEntry = entries.find((entry) => entry.name === ".git");
+  if (gitEntry?.isDirectory()) {
     await onRepo(rootDir);
     return;
   }
+  if (gitEntry) return;
 
   for (const entry of entries) {
     if (!entry.isDirectory() || shouldSkipDirectory(entry.name)) continue;
