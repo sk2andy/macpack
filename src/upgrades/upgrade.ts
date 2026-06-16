@@ -34,6 +34,7 @@ export function manifestForManagers(manifest: PackageManifest, managers: Set<Upg
     pnpmPackages: managers.has("pnpm") ? manifest.pnpmPackages : [],
     bunPackages: managers.has("bun") ? manifest.bunPackages : [],
     uvTools: managers.has("uv") ? manifest.uvTools : [],
+    repos: [],
   };
 }
 
@@ -65,6 +66,7 @@ function manifestForCandidates(candidates: UpgradeCandidate[]): PackageManifest 
     pnpmPackages: [],
     bunPackages: [],
     uvTools: [],
+    repos: [],
   };
 
   for (const candidate of candidates) {

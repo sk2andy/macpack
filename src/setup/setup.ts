@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { cancel, confirm, intro, isCancel, note, outro, select, spinner, text } from "@clack/prompts";
 import { assertMacOS } from "../core/platform.js";
 import { commandExists, run } from "../core/exec.js";
-import { collectInstalledManifest } from "../config/discovery.js";
+import { collectGitRepositories, collectInstalledManifest } from "../config/discovery.js";
+import { emptyManifest } from "../config/parser.js";
 import { configManifestPath, ensureManifestFile, pathExists, writeManifestFile } from "../config/defaults.js";
 
 type NodeInstallChoice = "volta" | "brew-node" | "nvm" | "skip";
@@ -170,16 +171,25 @@ async function ensureDefaultManifest(options: { dryRun?: boolean }): Promise<voi
   }
 
   const shouldPrefill = await askConfirm("Prefill it with currently installed packages?", true);
-  if (!shouldPrefill) {
+  const shouldScanRepos = await askConfirm("Scan your home folder for git repositories?", false);
+  if (!shouldPrefill && !shouldScanRepos) {
     await ensureManifestFile(manifestPath);
     note(manifestPath, "Default manifest created");
     return;
   }
 
-  const uvPython = await askText("Python version for discovered uv tools", "3.14");
-  const manifest = await withSpinner("Collecting installed packages", () => collectInstalledManifest({ uvPython }));
+  const uvPython = shouldPrefill ? await askText("Python version for discovered uv tools", "3.14") : undefined;
+  const manifest = shouldPrefill
+    ? await withSpinner("Collecting installed packages", () => collectInstalledManifest({ uvPython }))
+    : emptyManifest();
+
+  if (shouldScanRepos) {
+    manifest.repos.push(...(await withSpinner("Scanning home folder for git repositories", () => collectGitRepositories())));
+  }
+
   await writeManifestFile(manifestPath, manifest);
-  note(manifestPath, "Default manifest created from installed packages");
+  const sources = [shouldPrefill ? "installed packages" : undefined, shouldScanRepos ? "git repositories" : undefined].filter(Boolean);
+  note(manifestPath, `Default manifest created from ${sources.join(" and ")}`);
 }
 
 async function installVolta(options: { dryRun?: boolean }): Promise<void> {

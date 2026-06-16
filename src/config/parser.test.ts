@@ -1,10 +1,14 @@
+import { mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseMasList, parseUvToolList } from "./discovery.js";
+import { collectGitRepositories, parseMasList, parseUvToolList } from "./discovery.js";
 import { formatBrewfile } from "./brewfile.js";
 import { filterManifest, formatExport, formatPackageJson, formatRequirementsTxt } from "./exporters.js";
 import { addToManifest, removeFromManifest } from "./mutate.js";
 import { parseManifest } from "./parser.js";
 import { manifestForManagers, selectedManagers } from "../upgrades/upgrade.js";
+import { run } from "../core/exec.js";
 
 describe("parseManifest", () => {
   it("parses all supported package kinds", () => {
@@ -17,6 +21,7 @@ describe("parseManifest", () => {
       pnpm "serve"
       bun "@johnlindquist/worktree"
       uv "3.14" "serena-agent"
+      repo "git@github.com:sk2andy/macpack.git" "~/workspace/macpack"
     `);
 
     expect(manifest).toEqual({
@@ -28,6 +33,7 @@ describe("parseManifest", () => {
       pnpmPackages: ["serve"],
       bunPackages: ["@johnlindquist/worktree"],
       uvTools: [{ python: "3.14", packageName: "serena-agent" }],
+      repos: [{ url: "git@github.com:sk2andy/macpack.git", targetDir: "~/workspace/macpack" }],
     });
   });
 
@@ -95,6 +101,7 @@ describe("parseManifest", () => {
       pnpmPackages: [],
       bunPackages: [],
       uvTools: [{ python: "3.14", packageName: "serena-agent" }],
+      repos: [],
     });
   });
 
@@ -103,10 +110,13 @@ describe("parseManifest", () => {
       brew "uv"
       npm "tsx"
       uv "3.13" "serena-agent"
+      repo "git@github.com:sk2andy/macpack.git" "~/workspace/macpack"
     `);
 
     expect(addToManifest(manifest, "brew", ["gh", "uv"])).toBe(1);
     expect(addToManifest(manifest, "uv", ["serena-agent", "ruff==0.6.0"], { python: "3.14" })).toBe(1);
+    expect(addToManifest(manifest, "repo", ["https://github.com/sk2andy/macpack.git", "~/workspace/macpack"])).toBe(0);
+    expect(addToManifest(manifest, "repo", ["https://github.com/sk2andy/other.git", "~/workspace/other"])).toBe(1);
     expect(removeFromManifest(manifest, "npm", ["tsx"])).toBe(1);
 
     expect(manifest.brews).toEqual(["uv", "gh"]);
@@ -114,6 +124,10 @@ describe("parseManifest", () => {
     expect(manifest.uvTools).toEqual([
       { python: "3.14", packageName: "serena-agent" },
       { python: "3.14", packageName: "ruff==0.6.0" },
+    ]);
+    expect(manifest.repos).toEqual([
+      { url: "https://github.com/sk2andy/macpack.git", targetDir: "~/workspace/macpack" },
+      { url: "https://github.com/sk2andy/other.git", targetDir: "~/workspace/other" },
     ]);
   });
 
@@ -138,6 +152,7 @@ describe("parseManifest", () => {
       pnpmPackages: [],
       bunPackages: [],
       uvTools: [],
+      repos: [],
     });
   });
 
@@ -164,4 +179,27 @@ describe("parseManifest", () => {
       { python: "3.14", packageName: "serena-agent" },
     ]);
   });
+
+  it("collects git repositories while skipping worktree directories", async () => {
+    const root = await mkdtempInTmp("macpack-repos-");
+    const repo = join(root, "workspace", "macpack");
+    const skippedRepo = join(root, "worktree-directories", "ignored");
+    await initTestRepo(repo, "https://github.com/sk2andy/macpack.git");
+    await initTestRepo(skippedRepo, "https://github.com/sk2andy/ignored.git");
+
+    await expect(collectGitRepositories(root)).resolves.toEqual([
+      { url: "https://github.com/sk2andy/macpack.git", targetDir: repo },
+    ]);
+  });
 });
+
+async function mkdtempInTmp(prefix: string): Promise<string> {
+  const { mkdtemp } = await import("node:fs/promises");
+  return mkdtemp(join(tmpdir(), prefix));
+}
+
+async function initTestRepo(path: string, url: string): Promise<void> {
+  await mkdir(path, { recursive: true });
+  await run("git", ["init"], { cwd: path, quiet: true });
+  await run("git", ["remote", "add", "origin", url], { cwd: path, quiet: true });
+}

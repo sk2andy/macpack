@@ -1,15 +1,15 @@
 # macpack
 
 macpack is a universal macOS package manager CLI. It syncs one manifest across
-Homebrew, Mac App Store apps, npm/Volta tools, pnpm tools, bun tools, and uv
-Python tools.
+Homebrew, Mac App Store apps, npm/Volta tools, pnpm tools, bun tools, uv
+Python tools, and git repositories.
 
 It is designed for personal machine bootstrap and repeatable workstation setup.
 
 ## Features
 
 - One line-oriented manifest for `tap`, `brew`, `cask`, `mas`, `npm`, `pnpm`,
-  `bun`, and `uv`.
+  `bun`, `uv`, and `repo`.
 - Default manifest lookup: `./packages.macpack` first, then
   `~/.config/macpack/packages.macpack`.
 - `add` and `remove` commands for editing manifest entries.
@@ -50,7 +50,7 @@ Or install directly:
 brew install sk2andy/tap/macpack
 ```
 
-The Homebrew formula installs the `v0.1` macOS Apple Silicon executable from
+The Homebrew formula installs the `v0.2` macOS Apple Silicon executable from
 the GitHub release.
 
 For local development:
@@ -88,6 +88,8 @@ npm "tsx"
 pnpm "serve"
 bun "@johnlindquist/worktree"
 uv "3.14" "serena-agent"
+
+repo "https://github.com/sk2andy/macpack.git" "~/workspace/macpack"
 ```
 
 Comments are supported:
@@ -133,6 +135,7 @@ Common shortcuts:
 - `-a, --all` for `upgrade`
 - `-p, --python <version>` for `add uv`
 - `-i, --id <app-id>` for `add mas`
+- `--delete` for `remove repo`
 
 ## Commands
 
@@ -165,6 +168,7 @@ The setup flow:
 6. Installs uv if missing.
 7. Asks whether `~/.config/macpack/packages.macpack` should be created.
 8. If yes, asks whether it should be prefilled from installed packages.
+9. Asks whether the home folder should be scanned for git repositories.
 
 Prefill collects:
 
@@ -174,6 +178,8 @@ Prefill collects:
 - pnpm globals
 - bun globals from `~/.bun/install/global/package.json`
 - uv tools from `uv tool list`
+- git repositories under the home folder when enabled, skipping
+  `worktree-directories` and common cache/media folders
 
 `uv tool list` does not expose the Python version used for each tool, so setup
 asks for a Python version and writes that value for discovered uv tools.
@@ -186,6 +192,10 @@ Install or update packages in the manifest:
 macpack apply --file examples/packages.macpack
 macpack apply
 ```
+
+Repository entries are cloned when their target directory is missing. Existing
+repositories are left in place; if the target exists with a different origin,
+apply fails instead of overwriting it.
 
 Remove packages that are installed but no longer listed:
 
@@ -217,6 +227,7 @@ macpack add pnpm serve
 macpack add bun @johnlindquist/worktree
 macpack add uv -p 3.14 serena-agent
 macpack add mas -i 409183694 Keynote
+macpack add repo https://github.com/sk2andy/macpack.git ~/workspace/macpack
 ```
 
 Use `--file <path>` to edit a specific manifest. Without `--file`, macpack uses
@@ -238,10 +249,14 @@ macpack remove brew gh
 macpack remove npm tsx
 macpack remove uv serena-agent
 macpack remove mas 409183694
+macpack remove repo ~/workspace/macpack
+macpack remove repo ~/workspace/macpack --delete
 ```
 
 This edits the file only. Run `macpack apply --cleanup` or `macpack cleanup` to
-remove installed packages no longer listed.
+remove installed packages no longer listed. Repositories are never removed by
+`apply --cleanup` or `cleanup`; only `remove repo --delete` deletes a repo
+folder.
 
 ### `list`
 
@@ -325,6 +340,7 @@ Filters:
 - `--only-pnpm`
 - `--only-bun`
 - `--only-uv`
+- `--only-repos`
 
 Formats:
 
@@ -365,7 +381,7 @@ npm pack --dry-run
 ## Releases
 
 Releases are built by GitHub Actions. Run the `Release` workflow manually and
-provide a tag/version such as `v0.1`.
+provide a tag/version such as `v0.2`.
 
 The workflow runs on GitHub's `macos-26` arm64 runner, builds a darwin-arm64
 executable, creates a source archive, creates checksums, and publishes a GitHub

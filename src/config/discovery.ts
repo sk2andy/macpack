@@ -1,13 +1,31 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { emptyManifest } from "./parser.js";
 import { capture, commandExists } from "../core/exec.js";
-import type { PackageManifest, RunOptions } from "../core/types.js";
+import type { GitRepo, PackageManifest, RunOptions } from "../core/types.js";
 
 export interface DiscoveryOptions extends RunOptions {
   uvPython?: string;
 }
+
+const REPO_SCAN_SKIP_DIRECTORIES = new Set([
+  "Applications",
+  "Library",
+  "Movies",
+  "Music",
+  "Pictures",
+  ".Trash",
+  ".cache",
+  ".cargo",
+  ".gradle",
+  ".m2",
+  ".npm",
+  ".pnpm-store",
+  ".rustup",
+  "node_modules",
+  "worktree-directories",
+]);
 
 export async function collectInstalledManifest(options: DiscoveryOptions = {}): Promise<PackageManifest> {
   const manifest = emptyManifest();
@@ -20,6 +38,19 @@ export async function collectInstalledManifest(options: DiscoveryOptions = {}): 
   await collectUv(manifest, options);
 
   return dedupeManifest(manifest);
+}
+
+export async function collectGitRepositories(rootDir = homedir(), options: RunOptions = {}): Promise<GitRepo[]> {
+  if (!(await commandExists("git"))) return [];
+
+  const repos: GitRepo[] = [];
+  await walkForGitRepos(rootDir, async (targetDir) => {
+    const url = await gitRemoteUrl(targetDir, options);
+    if (!url) return;
+    repos.push({ url, targetDir: homeRelativePath(targetDir) });
+  });
+
+  return uniqueBy(repos, (repo) => repo.targetDir).sort((left, right) => left.targetDir.localeCompare(right.targetDir));
 }
 
 export function parseMasList(source: string): Array<{ name: string; id: string }> {
@@ -137,6 +168,7 @@ function dedupeManifest(manifest: PackageManifest): PackageManifest {
     uvTools: uniqueBy(manifest.uvTools, (tool) => tool.packageName).sort((left, right) =>
       left.packageName.localeCompare(right.packageName),
     ),
+    repos: uniqueBy(manifest.repos, (repo) => repo.targetDir).sort((left, right) => left.targetDir.localeCompare(right.targetDir)),
   };
 }
 
@@ -163,4 +195,39 @@ function packageNameFromSpec(spec: string): string {
   }
   const versionIndex = spec.indexOf("@");
   return versionIndex === -1 ? spec : spec.slice(0, versionIndex);
+}
+
+async function walkForGitRepos(rootDir: string, onRepo: (targetDir: string) => Promise<void>): Promise<void> {
+  let entries;
+  try {
+    entries = await readdir(rootDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  if (entries.some((entry) => entry.name === ".git")) {
+    await onRepo(rootDir);
+    return;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || shouldSkipDirectory(entry.name)) continue;
+    await walkForGitRepos(join(rootDir, entry.name), onRepo);
+  }
+}
+
+function shouldSkipDirectory(name: string): boolean {
+  return REPO_SCAN_SKIP_DIRECTORIES.has(name);
+}
+
+async function gitRemoteUrl(targetDir: string, options: RunOptions): Promise<string | undefined> {
+  const result = await capture("git", ["-C", targetDir, "config", "--get", "remote.origin.url"], options);
+  if (result.exitCode !== 0) return undefined;
+  return result.stdout.trim() || undefined;
+}
+
+function homeRelativePath(path: string): string {
+  const relativePath = relative(homedir(), path);
+  if (!relativePath || relativePath.startsWith("..")) return path;
+  return join("~", relativePath);
 }

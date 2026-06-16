@@ -23,11 +23,13 @@ Interactive bootstrap for macOS:
 6. If uv is missing, ask whether to install it.
 7. Ask whether to create `~/.config/macpack/packages.macpack`.
 8. If yes, ask whether to prefill it from installed packages.
+9. Ask whether to scan the home folder for git repositories.
 
 Default manifest prefill collects Homebrew taps/formulae/casks, MAS apps, npm
-globals, Volta packages, pnpm globals, bun globals, and uv tools. Because
-`uv tool list` does not expose the Python version for tools, setup asks for one
-Python version and uses it for discovered uv entries.
+globals, Volta packages, pnpm globals, bun globals, uv tools, and optionally git
+repositories under the home folder. Because `uv tool list` does not expose the
+Python version for tools, setup asks for one Python version and uses it for
+discovered uv entries.
 
 ## Manifest path default
 
@@ -51,10 +53,13 @@ Shortcuts:
 - `-a, --all`
 - `-p, --python <version>`
 - `-i, --id <app-id>`
+- `--delete`
 
 ## `apply [--file <path>]`
 
-Install/update packages in the manifest. Use `--cleanup` to remove installed tools not in the manifest. Managers with no entries are skipped.
+Install/update packages in the manifest. Repository entries are cloned when
+their target directory is missing. Use `--cleanup` to remove installed tools not
+in the manifest. Managers with no entries are skipped.
 
 By default, successful command output is collapsed into step status lines.
 Warnings remain visible. Failures print full command output. Use `--verbose` to
@@ -74,6 +79,7 @@ Kinds:
 - `pnpm`
 - `bun`
 - `uv`
+- `repo`
 
 Examples:
 
@@ -83,11 +89,13 @@ macpack add -g brew gh
 macpack add npm typescript@5.9.3 tsx
 macpack add uv -p 3.14 serena-agent
 macpack add mas -i 409183694 Keynote
+macpack add repo https://github.com/sk2andy/macpack.git ~/workspace/macpack
 ```
 
 ## `remove <kind> <packages...> [--file <path>]`
 
 Remove entries from a manifest. For `mas`, package values can be ids or names.
+For `repo`, values can be target directories or URLs.
 
 Examples:
 
@@ -95,7 +103,12 @@ Examples:
 macpack remove brew gh
 macpack remove uv serena-agent
 macpack remove mas 409183694
+macpack remove repo ~/workspace/macpack
+macpack remove repo ~/workspace/macpack --delete
 ```
+
+`remove repo --delete` deletes the repo folder after confirmation. `apply` and
+`cleanup` never delete repo folders.
 
 ## `list [--file <path>]`
 
@@ -110,7 +123,7 @@ macpack list --only-brew
 ```
 
 Supports `-f/--file`, `-g/--global`, and `--only-brew`, `--only-npm`,
-`--only-pnpm`, `--only-bun`, `--only-uv`.
+`--only-pnpm`, `--only-bun`, `--only-uv`, `--only-repos`.
 
 ## `edit [--file <path>]`
 
@@ -174,6 +187,7 @@ Filters:
 - `--only-pnpm`
 - `--only-bun`
 - `--only-uv`
+- `--only-repos`
 
 Formats:
 

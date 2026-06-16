@@ -1,6 +1,6 @@
 # Features
 
-- One manifest for Homebrew taps, formulae, casks, MAS apps, npm/Volta tools, pnpm tools, bun tools, and uv tools.
+- One manifest for Homebrew taps, formulae, casks, MAS apps, npm/Volta tools, pnpm tools, bun tools, uv tools, and git repositories.
 - Default manifest lookup via `./packages.macpack`, then `~/.config/macpack/packages.macpack`.
 - Optional setup prefill from currently installed packages.
 - Manifest editing via `add` and `remove`.
@@ -9,6 +9,7 @@
 - macOS-only runtime check before setup/apply operations.
 - Homebrew trust prompts for non-official taps when `HOMEBREW_REQUIRE_TAP_TRUST` is active.
 - Sync behavior: install missing packages, upgrade installed packages, and optionally remove entries no longer present in the manifest.
+- Repo sync behavior: clone missing git repositories, but never delete repositories during apply or cleanup.
 - Collapsed apply/upgrade/cleanup logs with warnings and errors kept visible.
 - Safe manifest parser: no shell evaluation.
 - Buildable ESM CLI with npm `bin` entry for future npm/Homebrew distribution.

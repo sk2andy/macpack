@@ -12,6 +12,7 @@
 #   pnpm "package"
 #   bun "package"
 #   uv "python-version" "package"
+#   repo "git-url" "target-directory"
 
 tap "azure/functions"
 tap "danielfoehrkn/switch"
@@ -171,3 +172,5 @@ bun "@openchamber/web"
 uv "3.14" "nano-pdf"
 uv "3.14" "serena-agent"
 uv "3.14" "mlx"
+
+repo "https://github.com/sk2andy/macpack.git" "~/workspace/macpack"

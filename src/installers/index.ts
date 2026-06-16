@@ -4,6 +4,7 @@ import { applyBrew, cleanupBrew, hasBrewEntries } from "./brew.js";
 import { applyBun, cleanupBun } from "./bun.js";
 import { applyNpm, cleanupNpm } from "./npm.js";
 import { applyPnpm, cleanupPnpm } from "./pnpm.js";
+import { applyRepos } from "./repos.js";
 import { applyUv, cleanupUv } from "./uv.js";
 
 export async function applyAll(manifest: PackageManifest, options: ApplyOptions = {}): Promise<void> {
@@ -32,6 +33,10 @@ export async function applyAll(manifest: PackageManifest, options: ApplyOptions 
     log.info(summary("uv", [["tools", manifest.uvTools.length]]));
   }
   await applyUv(manifest, options);
+  if (manifest.repos.length > 0) {
+    log.info(summary("repos", [["repositories", manifest.repos.length]]));
+  }
+  await applyRepos(manifest.repos, options);
 }
 
 export async function cleanupAll(manifest: PackageManifest, options: CleanupOptions = {}): Promise<void> {

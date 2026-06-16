@@ -2,9 +2,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { formatManifest } from "./exporters.js";
 import { emptyManifest, parseManifest } from "./parser.js";
-import type { MasApp, PackageManifest, UvTool } from "../core/types.js";
+import type { GitRepo, MasApp, PackageManifest, UvTool } from "../core/types.js";
 
-export type ManifestEntryKind = "tap" | "brew" | "cask" | "mas" | "npm" | "pnpm" | "bun" | "uv";
+export type ManifestEntryKind = "tap" | "brew" | "cask" | "mas" | "npm" | "pnpm" | "bun" | "uv" | "repo";
 
 export interface AddEntryOptions {
   python?: string;
@@ -14,6 +14,7 @@ export interface AddEntryOptions {
 export interface MutationResult {
   added?: number;
   removed?: number;
+  removedRepos?: GitRepo[];
   path: string;
 }
 
@@ -31,9 +32,11 @@ export async function addEntries(
 
 export async function removeEntries(path: string, kind: ManifestEntryKind, values: string[]): Promise<MutationResult> {
   const manifest = await readManifestOrEmpty(path);
+  const removeSet = new Set(values);
+  const removedRepos = kind === "repo" ? manifest.repos.filter((repo) => removeSet.has(repo.targetDir) || removeSet.has(repo.url)) : [];
   const removed = removeFromManifest(manifest, kind, values);
   await writeManifest(path, manifest);
-  return { removed, path };
+  return { removed, removedRepos, path };
 }
 
 export function addToManifest(
@@ -64,6 +67,9 @@ export function addToManifest(
       if (!options.masId) throw new Error("mas entries require --id <app-id>");
       if (values.length !== 1) throw new Error("mas add accepts one app name with --id");
       return appendUniqueMas(manifest.masApps, { name: values[0], id: options.masId });
+    case "repo":
+      if (values.length !== 2) throw new Error("repo add accepts one git URL and one target directory");
+      return appendUniqueRepo(manifest.repos, { url: values[0], targetDir: values[1] });
   }
 }
 
@@ -88,6 +94,8 @@ export function removeFromManifest(manifest: PackageManifest, kind: ManifestEntr
       return removeObjects(manifest.uvTools, (tool) => removeSet.has(tool.packageName));
     case "mas":
       return removeObjects(manifest.masApps, (app) => removeSet.has(app.id) || removeSet.has(app.name));
+    case "repo":
+      return removeObjects(manifest.repos, (repo) => removeSet.has(repo.targetDir) || removeSet.has(repo.url));
   }
 }
 
@@ -137,6 +145,16 @@ function appendUniqueMas(target: MasApp[], app: MasApp): number {
     return 0;
   }
   target.push(app);
+  return 1;
+}
+
+function appendUniqueRepo(target: GitRepo[], repo: GitRepo): number {
+  const existing = target.find((entry) => entry.targetDir === repo.targetDir);
+  if (existing) {
+    existing.url = repo.url;
+    return 0;
+  }
+  target.push(repo);
   return 1;
 }
 

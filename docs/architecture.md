@@ -5,7 +5,7 @@
 - `src/cli`: command definitions and option parsing.
 - `src/config`: manifest parser, formatter, default path resolution, and file mutations.
 - `src/core`: process execution, platform checks, and shared types.
-- `src/installers`: one installer per package ecosystem.
+- `src/installers`: one installer per package ecosystem plus repository sync.
 - `src/setup`: interactive bootstrap flows.
 - `src/upgrades`: outdated detection, manager filtering, and upgrade manifests.
 
@@ -19,9 +19,12 @@
    - pnpm uses global add/remove.
    - bun uses global install/remove.
    - uv uses `uv tool install --upgrade -p <python> <package>`.
+   - repos use `git clone <url> <target>` when the target directory is missing.
 4. Cleanup removes installed global tools not present in manifest when requested or when command is `cleanup`.
 
 macpack avoids broad `upgrade all globals` commands. Apply operations target packages named in the manifest.
+Repository entries are never deleted by apply or cleanup. Deletion requires
+`macpack remove repo <target> --delete`.
 
 ## Default Manifest Resolution
 
@@ -43,6 +46,8 @@ Setup prefill uses `src/config/discovery.ts` to collect installed packages:
 - `pnpm list -g --depth=0 --json`
 - Bun's global `package.json`
 - `uv tool list`
+- optional home-folder git repository scan, skipping `worktree-directories` and
+  common cache/media folders
 
 The collected manifest is deduped and sorted before writing.
 
@@ -65,4 +70,5 @@ Line-oriented DSL:
 command "arg1" "arg2"
 ```
 
-Comments start with `#` outside quoted strings. Supported commands: `tap`, `brew`, `cask`, `mas`, `npm`, `pnpm`, `bun`, `uv`.
+Comments start with `#` outside quoted strings. Supported commands: `tap`,
+`brew`, `cask`, `mas`, `npm`, `pnpm`, `bun`, `uv`, `repo`.

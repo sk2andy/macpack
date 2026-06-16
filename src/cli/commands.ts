@@ -10,6 +10,7 @@ import { commandExists, capture, run, shellEscape } from "../core/exec.js";
 import { assertMacOS, isMacOS } from "../core/platform.js";
 import { applyAll, cleanupAll } from "../installers/index.js";
 import { doctorBrew } from "../installers/brew.js";
+import { deleteRepoTargets, validateRepoTargetsForDeletion } from "../installers/repos.js";
 import { runSetup } from "../setup/setup.js";
 import {
   applyUpgradeCandidates,
@@ -43,6 +44,7 @@ interface ExportOptions extends FileOptions {
   packageJson?: boolean;
   requirementsTxt?: boolean;
   manifest?: boolean;
+  onlyRepos?: boolean;
 }
 
 interface ListOptions extends FileOptions {
@@ -51,11 +53,18 @@ interface ListOptions extends FileOptions {
   onlyPnpm?: boolean;
   onlyBun?: boolean;
   onlyUv?: boolean;
+  onlyRepos?: boolean;
 }
 
 interface AddOptions extends FileOptions {
   python?: string;
   id?: string;
+}
+
+interface RemoveOptions extends FileOptions {
+  delete?: boolean;
+  dryRun?: boolean;
+  yes?: boolean;
 }
 
 interface UpgradeOptions extends FileOptions {
@@ -70,7 +79,7 @@ export function createProgram(): Command {
 
   program
     .name("macpack")
-    .description("Universal macOS package manager for Homebrew, npm, pnpm, bun, and uv.")
+    .description("Universal macOS package manager for Homebrew, npm, pnpm, bun, uv, and git repositories.")
     .version(VERSION);
 
   program
@@ -128,8 +137,8 @@ export function createProgram(): Command {
   program
     .command("add")
     .description("Add entries to a manifest.")
-    .argument("<kind>", "tap, brew, cask, mas, npm, pnpm, bun, or uv")
-    .argument("<packages...>", "Package names, uv specs, or one mas app name")
+    .argument("<kind>", "tap, brew, cask, mas, npm, pnpm, bun, uv, or repo")
+    .argument("<packages...>", "Package names, uv specs, repo URL plus target dir, or one mas app name")
     .option("-f, --file <path>", "Manifest file")
     .option("-g, --global", "Use or create the global config manifest")
     .option("-p, --python <version>", "Python version for uv entries")
@@ -147,13 +156,32 @@ export function createProgram(): Command {
     .command("remove")
     .alias("rm")
     .description("Remove entries from a manifest.")
-    .argument("<kind>", "tap, brew, cask, mas, npm, pnpm, bun, or uv")
-    .argument("<packages...>", "Package names, uv package names, mas ids, or mas names")
+    .argument("<kind>", "tap, brew, cask, mas, npm, pnpm, bun, uv, or repo")
+    .argument("<packages...>", "Package names, uv package names, mas ids/names, or repo target directories")
     .option("-f, --file <path>", "Manifest file")
     .option("-g, --global", "Use the global config manifest")
-    .action(async (kind: ManifestEntryKind, packages: string[], options: FileOptions) => {
+    .option("--delete", "For repo entries, delete the target folder too")
+    .option("-n, --dry-run", "Print delete commands without deleting folders")
+    .option("-y, --yes", "Skip delete confirmation prompts")
+    .action(async (kind: ManifestEntryKind, packages: string[], options: RemoveOptions) => {
+      const normalizedKind = normalizeKind(kind);
+      if (options.delete && normalizedKind !== "repo") throw new Error("--delete is only supported for repo entries.");
       const file = await resolveManifestPath(options.file, { global: options.global });
-      const result = await removeEntries(file, normalizeKind(kind), packages);
+      const reposToDelete =
+        options.delete && normalizedKind === "repo" ? reposMatchingValues((await parseManifestFile(file)).repos, packages) : [];
+      if (options.delete) {
+        await validateRepoTargetsForDeletion(reposToDelete, {
+          dryRun: options.dryRun,
+          yes: options.yes,
+        });
+      }
+      const result = await removeEntries(file, normalizedKind, packages);
+      if (options.delete) {
+        await deleteRepoTargets(reposToDelete, {
+          dryRun: options.dryRun,
+          yes: options.yes,
+        });
+      }
       log.success(`Removed ${result.removed ?? 0} entr${result.removed === 1 ? "y" : "ies"} from ${result.path}`);
     });
 
@@ -168,6 +196,7 @@ export function createProgram(): Command {
     .option("--only-pnpm", "Only include pnpm entries")
     .option("--only-bun", "Only include bun entries")
     .option("--only-uv", "Only include uv entries")
+    .option("--only-repos", "Only include git repository entries")
     .action(async (options: ListOptions) => {
       const file = await resolveManifestPath(options.file, { global: options.global });
       const manifest = await parseManifestFile(file);
@@ -245,6 +274,7 @@ export function createProgram(): Command {
     .option("--only-pnpm", "Only include pnpm entries")
     .option("--only-bun", "Only include bun entries")
     .option("--only-uv", "Only include uv entries")
+    .option("--only-repos", "Only include git repository entries")
     .option("--brewfile", "Export as Homebrew Brewfile")
     .option("--package-json", "Export npm/pnpm/bun entries as package.json dependencies")
     .option("--requirements-txt", "Export uv tool package names as requirements.txt")
@@ -275,6 +305,7 @@ export function createProgram(): Command {
         pnpm: manifest.pnpmPackages.length,
         bun: manifest.bunPackages.length,
         uv: manifest.uvTools.length,
+        repos: manifest.repos.length,
       });
     });
 
@@ -292,6 +323,7 @@ export function createProgram(): Command {
         bun: await versionOrMissing("bun", ["--version"]),
         python3: await versionOrMissing("python3", ["--version"]),
         uv: await versionOrMissing("uv", ["--version"]),
+        git: await versionOrMissing("git", ["--version"]),
       };
       log.info(Object.entries(rows).map(([name, value]) => `${name.padEnd(8)} ${value}`).join("\n"));
     });
@@ -325,10 +357,10 @@ async function openEditor(file: string): Promise<void> {
 }
 
 function normalizeKind(kind: string): ManifestEntryKind {
-  if (["tap", "brew", "cask", "mas", "npm", "pnpm", "bun", "uv"].includes(kind)) {
+  if (["tap", "brew", "cask", "mas", "npm", "pnpm", "bun", "uv", "repo"].includes(kind)) {
     return kind as ManifestEntryKind;
   }
-  throw new Error(`Unsupported entry kind "${kind}". Use tap, brew, cask, mas, npm, pnpm, bun, or uv.`);
+  throw new Error(`Unsupported entry kind "${kind}". Use tap, brew, cask, mas, npm, pnpm, bun, uv, or repo.`);
 }
 
 async function selectUpgradeCandidates(candidates: UpgradeCandidate[]): Promise<UpgradeCandidate[]> {
@@ -351,6 +383,14 @@ async function selectUpgradeCandidates(candidates: UpgradeCandidate[]): Promise<
   return candidates.filter((candidate) => ids.has(candidate.id));
 }
 
+function reposMatchingValues(
+  repos: Array<{ url: string; targetDir: string }>,
+  values: string[],
+): Array<{ url: string; targetDir: string }> {
+  const removeSet = new Set(values);
+  return repos.filter((repo) => removeSet.has(repo.targetDir) || removeSet.has(repo.url));
+}
+
 function exportFilter(options: ExportOptions): ExportFilter {
   return {
     brew: options.onlyBrew,
@@ -358,6 +398,7 @@ function exportFilter(options: ExportOptions): ExportFilter {
     pnpm: options.onlyPnpm,
     bun: options.onlyBun,
     uv: options.onlyUv,
+    repos: options.onlyRepos,
   };
 }
 

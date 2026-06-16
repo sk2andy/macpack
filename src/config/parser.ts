@@ -11,6 +11,7 @@ export function emptyManifest(): PackageManifest {
     pnpmPackages: [],
     bunPackages: [],
     uvTools: [],
+    repos: [],
   };
 }
 
@@ -73,6 +74,10 @@ function addEntry(manifest: PackageManifest, command: string, args: string[], lo
     case "uv":
       expectArgs(command, args, 2, location);
       manifest.uvTools.push({ python: args[0], packageName: args[1] });
+      break;
+    case "repo":
+      expectArgs(command, args, 2, location);
+      manifest.repos.push({ url: args[0], targetDir: args[1] });
       break;
     default:
       throw new Error(`${location}: unsupported command "${command}"`);

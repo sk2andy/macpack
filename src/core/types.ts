@@ -10,6 +10,11 @@ export interface UvTool {
   packageName: string;
 }
 
+export interface GitRepo {
+  url: string;
+  targetDir: string;
+}
+
 export interface PackageManifest {
   taps: string[];
   brews: string[];
@@ -19,6 +24,7 @@ export interface PackageManifest {
   pnpmPackages: string[];
   bunPackages: string[];
   uvTools: UvTool[];
+  repos: GitRepo[];
 }
 
 export interface RunOptions {

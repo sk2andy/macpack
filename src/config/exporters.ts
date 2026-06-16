@@ -9,6 +9,7 @@ export interface ExportFilter {
   pnpm?: boolean;
   bun?: boolean;
   uv?: boolean;
+  repos?: boolean;
 }
 
 export function hasFilter(filter: ExportFilter): boolean {
@@ -27,6 +28,7 @@ export function filterManifest(manifest: PackageManifest, filter: ExportFilter):
     pnpmPackages: filter.pnpm ? manifest.pnpmPackages : [],
     bunPackages: filter.bun ? manifest.bunPackages : [],
     uvTools: filter.uv ? manifest.uvTools : [],
+    repos: filter.repos ? manifest.repos : [],
   };
 }
 
@@ -54,6 +56,7 @@ export function formatManifest(manifest: PackageManifest): string {
   for (const packageName of manifest.pnpmPackages) lines.push(`pnpm ${quote(packageName)}`);
   for (const packageName of manifest.bunPackages) lines.push(`bun ${quote(packageName)}`);
   for (const tool of manifest.uvTools) lines.push(`uv ${quote(tool.python)} ${quote(tool.packageName)}`);
+  for (const repo of manifest.repos) lines.push(`repo ${quote(repo.url)} ${quote(repo.targetDir)}`);
 
   return `${lines.join("\n")}\n`;
 }
