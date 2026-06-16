@@ -118,12 +118,13 @@ manifest in this order:
 1. `./packages.macpack` in the current directory, if it exists.
 2. `~/.config/macpack/packages.macpack`.
 
-`macpack setup` asks whether it should create the config default. If yes, it
-also asks whether to prefill it from currently installed packages. Commands can
-force the global config manifest with `--global`. `macpack add --global` creates
-that file if it does not exist. Without `--file` or `--global`, `add` uses the
-default lookup and creates `./packages.macpack` with a log message if neither
-default exists.
+`macpack setup` asks whether it should create the config default when it is
+missing. It then always asks whether to scan currently installed packages and
+whether to scan home-folder git repositories for the global manifest. Commands
+can force the global config manifest with `--global`. `macpack add --global`
+creates that file if it does not exist. Without `--file` or `--global`, `add`
+uses the default lookup and creates `./packages.macpack` with a log message if
+neither default exists.
 
 Common shortcuts:
 
@@ -166,11 +167,11 @@ The setup flow:
    - Homebrew Python
    - skip
 6. Installs uv if missing.
-7. Asks whether `~/.config/macpack/packages.macpack` should be created.
-8. If yes, asks whether it should be prefilled from installed packages.
+7. Asks whether `~/.config/macpack/packages.macpack` should be created if missing.
+8. Asks whether currently installed packages should be scanned.
 9. Asks whether the home folder should be scanned for git repositories.
 
-Prefill collects:
+Package scans collect:
 
 - Homebrew taps, formula leaves, and casks
 - Mac App Store apps from `mas list`
@@ -183,6 +184,8 @@ Prefill collects:
 
 `uv tool list` does not expose the Python version used for each tool, so setup
 asks for a Python version and writes that value for discovered uv tools.
+Scan results are merged into the global manifest and deduped, preserving
+existing manual entries.
 
 ### `apply`
 

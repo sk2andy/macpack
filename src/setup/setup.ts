@@ -4,8 +4,9 @@ import { cancel, confirm, intro, isCancel, note, outro, select, spinner, text } 
 import { assertMacOS } from "../core/platform.js";
 import { commandExists, run } from "../core/exec.js";
 import { collectGitRepositories, collectInstalledManifest } from "../config/discovery.js";
-import { emptyManifest } from "../config/parser.js";
+import { emptyManifest, parseManifestFile } from "../config/parser.js";
 import { configManifestPath, ensureManifestFile, pathExists, writeManifestFile } from "../config/defaults.js";
+import type { PackageManifest } from "../core/types.js";
 
 type NodeInstallChoice = "volta" | "brew-node" | "nvm" | "skip";
 type BunInstallChoice = "official" | "brew" | "skip";
@@ -160,36 +161,84 @@ async function ensureUv(options: { dryRun?: boolean }): Promise<void> {
 
 async function ensureDefaultManifest(options: { dryRun?: boolean }): Promise<void> {
   const manifestPath = configManifestPath();
-  if (await pathExists(manifestPath)) return;
+  const exists = await pathExists(manifestPath);
 
-  const shouldCreate = await askConfirm(`Create default manifest at ${manifestPath}?`, true);
-  if (!shouldCreate) return;
+  if (!exists) {
+    const shouldCreate = await askConfirm(`Create default manifest at ${manifestPath}?`, true);
+    if (!shouldCreate) return;
+  }
+
+  const shouldPrefill = await askConfirm("Scan currently installed packages for the global manifest?", true);
+  const shouldScanRepos = await askConfirm("Scan your home folder for git repositories?", false);
 
   if (options.dryRun) {
-    note(manifestPath, "Would create default manifest");
+    note(manifestPath, exists ? "Would update global manifest" : "Would create default manifest");
     return;
   }
 
-  const shouldPrefill = await askConfirm("Prefill it with currently installed packages?", true);
-  const shouldScanRepos = await askConfirm("Scan your home folder for git repositories?", false);
   if (!shouldPrefill && !shouldScanRepos) {
     await ensureManifestFile(manifestPath);
-    note(manifestPath, "Default manifest created");
+    note(manifestPath, exists ? "Global manifest unchanged" : "Default manifest created");
     return;
   }
 
+  const manifest = exists ? await parseManifestFile(manifestPath) : emptyManifest();
   const uvPython = shouldPrefill ? await askText("Python version for discovered uv tools", "3.14") : undefined;
-  const manifest = shouldPrefill
-    ? await withSpinner("Collecting installed packages", () => collectInstalledManifest({ uvPython }))
-    : emptyManifest();
+  if (shouldPrefill) {
+    mergeManifest(manifest, await withSpinner("Collecting installed packages", () => collectInstalledManifest({ uvPython })));
+  }
 
   if (shouldScanRepos) {
     manifest.repos.push(...(await withSpinner("Scanning home folder for git repositories", () => collectGitRepositories())));
   }
 
-  await writeManifestFile(manifestPath, manifest);
+  await writeManifestFile(manifestPath, dedupeManifest(manifest));
   const sources = [shouldPrefill ? "installed packages" : undefined, shouldScanRepos ? "git repositories" : undefined].filter(Boolean);
-  note(manifestPath, `Default manifest created from ${sources.join(" and ")}`);
+  note(manifestPath, `${exists ? "Global manifest updated" : "Default manifest created"} from ${sources.join(" and ")}`);
+}
+
+function mergeManifest(target: PackageManifest, source: PackageManifest): void {
+  target.taps.push(...source.taps);
+  target.brews.push(...source.brews);
+  target.casks.push(...source.casks);
+  target.masApps.push(...source.masApps);
+  target.npmPackages.push(...source.npmPackages);
+  target.pnpmPackages.push(...source.pnpmPackages);
+  target.bunPackages.push(...source.bunPackages);
+  target.uvTools.push(...source.uvTools);
+  target.repos.push(...source.repos);
+}
+
+function dedupeManifest(manifest: PackageManifest): PackageManifest {
+  return {
+    taps: uniqueSorted(manifest.taps),
+    brews: uniqueSorted(manifest.brews),
+    casks: uniqueSorted(manifest.casks),
+    masApps: uniqueBy(manifest.masApps, (app) => app.id).sort((left, right) => left.name.localeCompare(right.name)),
+    npmPackages: uniqueSorted(manifest.npmPackages),
+    pnpmPackages: uniqueSorted(manifest.pnpmPackages),
+    bunPackages: uniqueSorted(manifest.bunPackages),
+    uvTools: uniqueBy(manifest.uvTools, (tool) => tool.packageName).sort((left, right) =>
+      left.packageName.localeCompare(right.packageName),
+    ),
+    repos: uniqueBy(manifest.repos, (repo) => repo.targetDir).sort((left, right) => left.targetDir.localeCompare(right.targetDir)),
+  };
+}
+
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function uniqueBy<T>(values: T[], keyFor: (value: T) => string): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const value of values) {
+    const key = keyFor(value);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(value);
+  }
+  return result;
 }
 
 async function installVolta(options: { dryRun?: boolean }): Promise<void> {

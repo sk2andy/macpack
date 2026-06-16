@@ -32,13 +32,14 @@ Commands with `--file` accept an explicit manifest path. Without it, macpack
 uses `./packages.macpack` when present, otherwise
 `~/.config/macpack/packages.macpack`. `--global` forces the config manifest. If
 neither exists, read commands fail with a clear error. Setup can create the
-config default and optionally prefill it from installed packages. `add` creates
-`./packages.macpack` when neither default exists. `add --global` writes the
-config manifest directly.
+config default and always offers package and repository scans for the global
+manifest. `add` creates `./packages.macpack` when neither default exists.
+`add --global` writes the config manifest directly.
 
 ## Discovery Flow
 
-Setup prefill uses `src/config/discovery.ts` to collect installed packages:
+Setup scans use `src/config/discovery.ts` to collect installed packages and
+repositories:
 
 - `brew tap`, `brew leaves`, and `brew list --cask`
 - `mas list`
@@ -49,7 +50,8 @@ Setup prefill uses `src/config/discovery.ts` to collect installed packages:
 - optional home-folder git repository scan, skipping `worktree-directories` and
   common cache/media folders
 
-The collected manifest is deduped and sorted before writing.
+Collected entries are merged into the global manifest, deduped, and sorted
+before writing.
 
 ## Upgrade Flow
 
