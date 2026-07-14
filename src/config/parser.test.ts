@@ -7,6 +7,7 @@ import { formatBrewfile } from "./brewfile.js";
 import { filterManifest, formatExport, formatPackageJson, formatRequirementsTxt } from "./exporters.js";
 import { addToManifest, removeFromManifest } from "./mutate.js";
 import { parseManifest } from "./parser.js";
+import { manifestForApplyManagers, selectedApplyManagers } from "../installers/index.js";
 import { manifestForManagers, selectedManagers } from "../upgrades/upgrade.js";
 import { run } from "../core/exec.js";
 
@@ -154,6 +155,36 @@ describe("parseManifest", () => {
       uvTools: [],
       repos: [],
     });
+  });
+
+  it("selects manifest sections for apply managers", () => {
+    const manifest = parseManifest(`
+      tap "azure/functions"
+      brew "uv"
+      cask "postman"
+      mas "Keynote" "409183694"
+      npm "tsx"
+      pnpm "serve"
+      bun "@johnlindquist/worktree"
+      uv "3.14" "serena-agent"
+      repo "https://github.com/sk2andy/macpack.git" "~/workspace/macpack"
+    `);
+
+    expect(manifestForApplyManagers(manifest, selectedApplyManagers("npm"))).toEqual({
+      taps: [],
+      brews: [],
+      casks: [],
+      masApps: [],
+      npmPackages: ["tsx"],
+      pnpmPackages: [],
+      bunPackages: [],
+      uvTools: [],
+      repos: [],
+    });
+
+    expect(manifestForApplyManagers(manifest, selectedApplyManagers("repo")).repos).toEqual([
+      { url: "https://github.com/sk2andy/macpack.git", targetDir: "~/workspace/macpack" },
+    ]);
   });
 
   it("parses installed mas apps", () => {

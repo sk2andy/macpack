@@ -8,7 +8,7 @@ import { addEntries, removeEntries, type ManifestEntryKind } from "../config/mut
 import { parseManifestFile } from "../config/parser.js";
 import { commandExists, capture, run, shellEscape } from "../core/exec.js";
 import { assertMacOS, isMacOS } from "../core/platform.js";
-import { applyAll, cleanupAll } from "../installers/index.js";
+import { applyAll, cleanupAll, manifestForApplyManagers, selectedApplyManagers } from "../installers/index.js";
 import { doctorBrew } from "../installers/brew.js";
 import { deleteRepoTargets, validateRepoTargetsForDeletion } from "../installers/repos.js";
 import { runSetup } from "../setup/setup.js";
@@ -92,24 +92,30 @@ export function createProgram(): Command {
 
   program
     .command("apply")
-    .description("Install/update all packages from a manifest.")
+    .description("Install/update packages from a manifest.")
+    .argument("[manager]", "brew, npm, pnpm, bun, uv, repos, or all", "all")
     .option("-f, --file <path>", "Manifest file")
     .option("-g, --global", "Use the global config manifest")
     .option("--cleanup", "Remove installed tools not present in manifest")
     .option("-y, --yes", "Answer yes to trust prompts")
     .option("-n, --dry-run", "Print commands without running them")
     .option("-v, --verbose", "Stream command output instead of collapsing successful steps")
-    .action(async (options: MutatingOptions) => {
+    .action(async (manager: string, options: MutatingOptions) => {
       assertMacOS();
       intro("macpack apply");
       const file = await resolveManifestPath(options.file, { global: options.global });
       const manifest = await parseManifestFile(file);
-      await applyAll(manifest, {
-        cleanup: options.cleanup,
-        dryRun: options.dryRun,
-        yes: options.yes,
-        verbose: options.verbose,
-      });
+      const managers = selectedApplyManagers(manager);
+      await applyAll(
+        manifestForApplyManagers(manifest, managers),
+        {
+          cleanup: options.cleanup,
+          dryRun: options.dryRun,
+          yes: options.yes,
+          verbose: options.verbose,
+        },
+        managers,
+      );
       outro("Apply complete.");
     });
 

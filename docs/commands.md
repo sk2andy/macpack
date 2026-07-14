@@ -56,11 +56,14 @@ Shortcuts:
 - `-i, --id <app-id>`
 - `--delete`
 
-## `apply [--file <path>]`
+## `apply [manager] [--file <path>]`
 
 Install/update packages in the manifest. Repository entries are cloned when
 their target directory is missing. Use `--cleanup` to remove installed tools not
 in the manifest. Managers with no entries are skipped.
+
+`manager` defaults to `all`. Use `brew`, `npm`, `pnpm`, `bun`, `uv`, `repo`, or
+`repos` to apply only that manifest section and skip the others.
 
 By default, successful command output is collapsed into step status lines.
 Warnings remain visible. Failures print full command output. Use `--verbose` to
