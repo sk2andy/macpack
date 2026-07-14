@@ -13,14 +13,15 @@
 
 1. Parse manifest file into typed sections.
 2. Check macOS when command mutates machine state.
-3. Run ecosystem installers only for sections that have manifest entries:
-   - Homebrew writes a temporary Brewfile, ensures taps, prompts for tap trust, runs bundle, and cleanup.
+3. Select the requested apply manager from `apply [manager]`; `all` keeps every section.
+4. Run ecosystem installers only for selected sections that have manifest entries:
+   - Homebrew ensures taps, prompts for tap trust, and installs formulae, casks, and MAS apps as individual progress steps. Brew Bundle is only used for cleanup.
    - npm prefers Volta when present and falls back to npm globals.
    - pnpm uses global add/remove.
    - bun uses global install/remove.
    - uv uses `uv tool install --upgrade -p <python> <package>`.
    - repos use `git clone <url> <target>` when the target directory is missing.
-4. Cleanup removes installed global tools not present in manifest when requested or when command is `cleanup`.
+5. Cleanup removes installed global tools not present in manifest when requested or when command is `cleanup`.
 
 macpack avoids broad `upgrade all globals` commands. Apply operations target packages named in the manifest.
 Repository entries are never deleted by apply or cleanup. Deletion requires
