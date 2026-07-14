@@ -1,4 +1,3 @@
-import { log } from "@clack/prompts";
 import { capture, commandExists, runStep } from "../core/exec.js";
 import type { ApplyOptions, CleanupOptions, PackageManifest } from "../core/types.js";
 
@@ -8,7 +7,6 @@ export async function applyUv(manifest: PackageManifest, options: ApplyOptions =
   if (!(await commandExists("uv"))) throw new Error("uv is not installed. Run `macpack setup` first.");
 
   for (const [index, tool] of manifest.uvTools.entries()) {
-    log.info(`uv tool ${index + 1}/${manifest.uvTools.length}: ${tool.packageName} (${tool.python})`);
     await runStep(`uv tool ${index + 1}/${manifest.uvTools.length}: ${tool.packageName}`, "uv", [
       "tool",
       "install",

@@ -1,4 +1,3 @@
-import { log } from "@clack/prompts";
 import { capture, commandExists, runStep } from "../core/exec.js";
 import type { ApplyOptions, CleanupOptions, PackageManifest } from "../core/types.js";
 
@@ -8,14 +7,12 @@ export async function applyNpm(manifest: PackageManifest, options: ApplyOptions 
 
   if (await commandExists("volta")) {
     for (const packageName of manifest.npmPackages) {
-      log.info(`npm via Volta: installing ${packageName}`);
       await runStep(`npm via Volta: installing ${packageName}`, "volta", ["install", packageName], options);
     }
     return;
   }
 
   if (!(await commandExists("npm"))) throw new Error("npm is not installed. Run `macpack setup` first.");
-  log.info(`npm: installing ${manifest.npmPackages.length} global packages`);
   await runStep("npm: installing global packages", "npm", ["install", "-g", ...manifest.npmPackages], options);
 }
 
