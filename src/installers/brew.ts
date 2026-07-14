@@ -127,9 +127,38 @@ async function writeTempBrewfile(manifest: PackageManifest): Promise<string> {
 }
 
 async function installBrews(brews: string[], options: RunOptions): Promise<void> {
+  if (brews.length === 0) return;
+  const outdatedBrews = options.dryRun ? new Set<string>() : await outdatedBrewNames(options);
+
   for (const [index, brew] of brews.entries()) {
-    await runStep(`Homebrew brew ${index + 1}/${brews.length}: ${brew}`, "brew", ["install", "--formula", brew], options);
+    const label = `Homebrew brew ${index + 1}/${brews.length}: ${brew}`;
+    const installedResult = options.dryRun
+      ? { stdout: "", stderr: "", exitCode: 1 }
+      : await capture("brew", ["list", "--formula", "--versions", brew], options);
+    const installed = installedResult.exitCode === 0;
+    if (installed && !packageIsOutdated(outdatedBrews, brew, installedResult.stdout)) {
+      log.success(`${label} (up to date)`);
+      continue;
+    }
+
+    const args = installed ? ["upgrade", "--formula", brew] : ["install", "--formula", brew];
+    await runStep(`${label}: ${installed ? "updating" : "installing"}`, "brew", args, options);
   }
+}
+
+function packageIsOutdated(outdatedPackages: Set<string>, packageName: string, installedVersions: string): boolean {
+  const shortName = packageName.split("/").at(-1) ?? packageName;
+  const canonicalName = installedVersions.trim().split(/\s+/)[0];
+  return outdatedPackages.has(packageName) || outdatedPackages.has(shortName) || outdatedPackages.has(canonicalName);
+}
+
+async function outdatedBrewNames(options: RunOptions): Promise<Set<string>> {
+  const result = await capture("brew", ["outdated", "--formula", "--json=v2"], options);
+  if (result.exitCode !== 0) {
+    throw new Error(commandFailure("brew outdated --formula --json=v2", "", result.stdout, result.stderr, result.exitCode));
+  }
+  const data = JSON.parse(result.stdout || "{}") as { formulae?: Array<{ name: string }> };
+  return new Set((data.formulae ?? []).map((brew) => brew.name));
 }
 
 async function installCasks(casks: string[], options: RunOptions): Promise<void> {
