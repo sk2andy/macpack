@@ -1,4 +1,3 @@
-import { log } from "@clack/prompts";
 import { capture, commandExists, runStep } from "../core/exec.js";
 import type { ApplyOptions, CleanupOptions, PackageManifest } from "../core/types.js";
 
@@ -7,7 +6,6 @@ export async function applyPnpm(manifest: PackageManifest, options: ApplyOptions
   if (manifest.pnpmPackages.length === 0) return;
   if (!(await commandExists("pnpm"))) throw new Error("pnpm is not installed. Add `npm \"pnpm\"` or run setup.");
 
-  log.info(`pnpm: installing ${manifest.pnpmPackages.length} global packages`);
   await runStep("pnpm: installing global packages", "pnpm", ["add", "-g", ...manifest.pnpmPackages], options);
 }
 

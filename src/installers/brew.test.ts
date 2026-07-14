@@ -173,6 +173,7 @@ describe("applyBrew", () => {
     await applyBrew(manifest({ casks: ["postman"] }));
 
     expect(execMocks.captureStep).not.toHaveBeenCalled();
+    expect(promptMocks.log.success).toHaveBeenCalledWith("Homebrew cask 1/1: postman (up to date)");
   });
 
   it("skips MAS apps that are already up to date", async () => {
@@ -186,6 +187,23 @@ describe("applyBrew", () => {
 
     expect(execMocks.runStep).not.toHaveBeenCalled();
     expect(execMocks.captureStep).not.toHaveBeenCalled();
+    expect(promptMocks.log.success).toHaveBeenCalledWith("Homebrew MAS 1/1: Keynote (up to date)");
+  });
+
+  it("shows installed taps as successful without duplicate progress", async () => {
+    execMocks.commandExists.mockResolvedValue(true);
+    execMocks.capture.mockImplementation(async (command: string, args: string[]) => {
+      if (command === "xcode-select") return { stdout: "/Applications/Xcode.app/Contents/Developer\n", stderr: "", exitCode: 0 };
+      if (command === "brew" && args[0] === "tap-info") {
+        return { stdout: '[{"installed": true, "official": true}]', stderr: "", exitCode: 0 };
+      }
+      return { stdout: "[]", stderr: "", exitCode: 0 };
+    });
+
+    await applyBrew(manifest({ taps: ["oven-sh/bun"] }));
+
+    expect(execMocks.runStep).not.toHaveBeenCalled();
+    expect(promptMocks.log.success).toHaveBeenCalledWith("Homebrew tap 1/1: oven-sh/bun (up to date)");
   });
 
   it("falls back to mas get when mas install fails", async () => {

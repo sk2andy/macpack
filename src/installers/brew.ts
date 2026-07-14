@@ -80,14 +80,17 @@ async function brewEnv(env: NodeJS.ProcessEnv = {}): Promise<NodeJS.ProcessEnv> 
 
 async function ensureTaps(taps: string[], options: RunOptions): Promise<void> {
   for (const [index, tap] of taps.entries()) {
-    log.info(`Homebrew tap ${index + 1}/${taps.length}: ${tap}`);
+    const label = `Homebrew tap ${index + 1}/${taps.length}: ${tap}`;
     if (options.dryRun) {
-      await runStep(`Homebrew tap ${index + 1}/${taps.length}: ${tap}`, "brew", ["tap", tap], options);
+      await runStep(label, "brew", ["tap", tap], options);
       continue;
     }
     const info = await capture("brew", ["tap-info", "--json", tap], options);
-    if (info.exitCode === 0 && info.stdout.includes(`"installed": true`)) continue;
-    await runStep(`Homebrew tap ${index + 1}/${taps.length}: ${tap}`, "brew", ["tap", tap], options);
+    if (info.exitCode === 0 && info.stdout.includes(`"installed": true`)) {
+      log.success(`${label} (up to date)`);
+      continue;
+    }
+    await runStep(`${label}: installing`, "brew", ["tap", tap], options);
   }
 }
 
@@ -169,7 +172,7 @@ async function installCasks(casks: string[], options: RunOptions): Promise<void>
     const label = `Homebrew cask ${index + 1}/${casks.length}: ${cask}`;
     const installed = options.dryRun ? false : (await capture("brew", ["list", "--cask", "--versions", cask], options)).exitCode === 0;
     if (installed && !outdatedCasks.has(cask)) {
-      log.info(`${label} (up to date)`);
+      log.success(`${label} (up to date)`);
       continue;
     }
 
@@ -208,7 +211,7 @@ async function installMasApps(apps: PackageManifest["masApps"], options: RunOpti
     const label = `Homebrew MAS ${index + 1}/${apps.length}: ${app.name}`;
     if (installedIds.has(app.id)) {
       if (!outdatedIds.has(app.id)) {
-        log.info(`${label} (up to date)`);
+        log.success(`${label} (up to date)`);
         continue;
       }
       await runStep(`${label}: updating`, "mas", ["update", app.id], options);
