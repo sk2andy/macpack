@@ -19,15 +19,11 @@ export function hasBrewEntries(manifest: PackageManifest): boolean {
 export async function applyBrew(manifest: PackageManifest, options: ApplyOptions = {}): Promise<void> {
   if (!hasBrewEntries(manifest)) return;
   if (options.dryRun) {
-    const brewfile = await writeTempBrewfile(manifest);
-    try {
-      await runStep("Homebrew: running brew bundle", "brew", ["bundle", "--file", brewfile], options);
-      if (options.cleanup) {
-        await runStep("Homebrew: running brew bundle cleanup", "brew", ["bundle", "cleanup", "--force", "--file", brewfile], options);
-      }
-    } finally {
-      await rm(dirname(brewfile), { force: true, recursive: true });
-    }
+    await ensureTaps(manifest.taps, options);
+    await installBrews(manifest.brews, options);
+    await installCasks(manifest.casks, options);
+    await installMasApps(manifest.masApps, options);
+    if (options.cleanup) await cleanupBrew(manifest, options);
     return;
   }
 
@@ -38,17 +34,12 @@ export async function applyBrew(manifest: PackageManifest, options: ApplyOptions
   await ensureTaps(manifest.taps, { ...options, env });
   await promptForTapTrust(manifest.taps, options.yes ?? false, { ...options, env });
 
-  const skippedCasks = await installMissingCasksWithForce(manifest.casks, { ...options, env });
-  const effectiveManifest = skippedCasks.size > 0 ? withoutCasks(manifest, skippedCasks) : manifest;
-  const brewfile = await writeTempBrewfile(effectiveManifest);
-  try {
-    await runStep("Homebrew: running brew bundle", "brew", ["bundle", "--file", brewfile], { ...options, env });
-    if (options.cleanup) {
-      log.info("Homebrew: running brew bundle cleanup");
-      await cleanupBrew(manifest, { ...options, env });
-    }
-  } finally {
-    await rm(dirname(brewfile), { force: true, recursive: true });
+  await installBrews(manifest.brews, { ...options, env });
+  await installCasks(manifest.casks, { ...options, env });
+  await installMasApps(manifest.masApps, { ...options, env });
+  if (options.cleanup) {
+    log.info("Homebrew: running brew bundle cleanup");
+    await cleanupBrew(manifest, { ...options, env });
   }
 }
 
@@ -90,6 +81,10 @@ async function brewEnv(env: NodeJS.ProcessEnv = {}): Promise<NodeJS.ProcessEnv> 
 async function ensureTaps(taps: string[], options: RunOptions): Promise<void> {
   for (const [index, tap] of taps.entries()) {
     log.info(`Homebrew tap ${index + 1}/${taps.length}: ${tap}`);
+    if (options.dryRun) {
+      await runStep(`Homebrew tap ${index + 1}/${taps.length}: ${tap}`, "brew", ["tap", tap], options);
+      continue;
+    }
     const info = await capture("brew", ["tap-info", "--json", tap], options);
     if (info.exitCode === 0 && info.stdout.includes(`"installed": true`)) continue;
     await runStep(`Homebrew tap ${index + 1}/${taps.length}: ${tap}`, "brew", ["tap", tap], options);
@@ -131,41 +126,85 @@ async function writeTempBrewfile(manifest: PackageManifest): Promise<string> {
   return path;
 }
 
-async function installMissingCasksWithForce(casks: string[], options: RunOptions): Promise<Set<string>> {
-  const skipped = new Set<string>();
-  if (casks.length === 0) return skipped;
+async function installBrews(brews: string[], options: RunOptions): Promise<void> {
+  for (const [index, brew] of brews.entries()) {
+    await runStep(`Homebrew brew ${index + 1}/${brews.length}: ${brew}`, "brew", ["install", "--formula", brew], options);
+  }
+}
 
-  log.info(`Homebrew: checking ${casks.length} casks`);
+async function installCasks(casks: string[], options: RunOptions): Promise<void> {
+  if (casks.length === 0) return;
+  const outdatedCasks = options.dryRun ? new Set<string>() : await outdatedCaskNames(options);
+
   for (const [index, cask] of casks.entries()) {
-    log.info(`Homebrew cask ${index + 1}/${casks.length}: ${cask}`);
-    const installed = await capture("brew", ["list", "--cask", "--versions", cask], options);
-    if (installed.exitCode === 0) continue;
+    const label = `Homebrew cask ${index + 1}/${casks.length}: ${cask}`;
+    const installed = options.dryRun ? false : (await capture("brew", ["list", "--cask", "--versions", cask], options)).exitCode === 0;
+    if (installed && !outdatedCasks.has(cask)) {
+      log.info(`${label} (up to date)`);
+      continue;
+    }
 
-    const result = await captureStep(`Homebrew cask ${index + 1}/${casks.length}: installing ${cask}`, "brew", [
-      "install",
-      "--cask",
-      "--force",
-      cask,
-    ], options);
+    const command = installed ? "brew upgrade --cask" : "brew install --cask --force";
+    const args = installed ? ["upgrade", "--cask", cask] : ["install", "--cask", "--force", cask];
+    const result = await captureStep(`${label}: ${installed ? "updating" : "installing"}`, "brew", args, options);
     if (result.exitCode === 0) continue;
 
-    if (isUnavailableCask(result.stdout, result.stderr)) {
-      skipped.add(cask);
+    if (!installed && isUnavailableCask(result.stdout, result.stderr)) {
       log.warn(`Skipping unavailable Homebrew cask "${cask}". Remove or rename it in your manifest.`);
       continue;
     }
 
-    throw new Error(commandFailure("brew install --cask --force", cask, result.stdout, result.stderr, result.exitCode));
+    throw new Error(commandFailure(command, cask, result.stdout, result.stderr, result.exitCode));
   }
-
-  return skipped;
 }
 
-function withoutCasks(manifest: PackageManifest, skipped: Set<string>): PackageManifest {
-  return {
-    ...manifest,
-    casks: manifest.casks.filter((cask) => !skipped.has(cask)),
-  };
+async function outdatedCaskNames(options: RunOptions): Promise<Set<string>> {
+  const result = await capture("brew", ["outdated", "--cask", "--json=v2"], options);
+  if (result.exitCode !== 0) {
+    throw new Error(commandFailure("brew outdated --cask --json=v2", "", result.stdout, result.stderr, result.exitCode));
+  }
+  const data = JSON.parse(result.stdout || "{}") as { casks?: Array<{ name: string }> };
+  return new Set((data.casks ?? []).map((cask) => cask.name));
+}
+
+async function installMasApps(apps: PackageManifest["masApps"], options: RunOptions): Promise<void> {
+  if (apps.length === 0) return;
+  if (!options.dryRun && !(await commandExists("mas"))) {
+    throw new Error("mas is not installed. Add `brew \"mas\"` to the manifest or install it first.");
+  }
+
+  const installedIds = options.dryRun ? new Set<string>() : await masAppIds("list", options);
+  const outdatedIds = options.dryRun ? new Set<string>() : await masAppIds("outdated", options);
+  for (const [index, app] of apps.entries()) {
+    const label = `Homebrew MAS ${index + 1}/${apps.length}: ${app.name}`;
+    if (installedIds.has(app.id)) {
+      if (!outdatedIds.has(app.id)) {
+        log.info(`${label} (up to date)`);
+        continue;
+      }
+      await runStep(`${label}: updating`, "mas", ["update", app.id], options);
+      continue;
+    }
+
+    const installed = await captureStep(`${label}: installing`, "mas", ["install", app.id], options);
+    if (installed.exitCode === 0) continue;
+
+    const acquired = await captureStep(`${label}: getting`, "mas", ["get", app.id], options);
+    if (acquired.exitCode === 0) continue;
+
+    throw new Error(commandFailure("mas get", `${app.name} (${app.id})`, acquired.stdout, acquired.stderr, acquired.exitCode));
+  }
+}
+
+async function masAppIds(command: "list" | "outdated", options: RunOptions): Promise<Set<string>> {
+  const result = await capture("mas", [command], options);
+  if (result.exitCode !== 0) return new Set();
+  return new Set(
+    result.stdout
+      .split("\n")
+      .map((line) => line.trim().split(/\s+/)[0])
+      .filter(Boolean),
+  );
 }
 
 function isUnavailableCask(stdout: string, stderr: string): boolean {
@@ -175,5 +214,6 @@ function isUnavailableCask(stdout: string, stderr: string): boolean {
 
 function commandFailure(command: string, name: string, stdout: string, stderr: string, exitCode: number): string {
   const output = [stdout.trim(), stderr.trim()].filter(Boolean).join("\n");
-  return `${command} ${name} failed with exit code ${exitCode}${output ? `\n${output}` : ""}`;
+  const rendered = [command, name].filter(Boolean).join(" ");
+  return `${rendered} failed with exit code ${exitCode}${output ? `\n${output}` : ""}`;
 }

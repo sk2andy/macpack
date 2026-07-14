@@ -64,7 +64,7 @@ await writeFile(
   "utf8",
 );
 
-await execFileAsync("node", ["--build-sea", seaConfigPath], { cwd: root, stdio: "inherit" });
+await execFileAsync(officialNodeBinary, ["--build-sea", seaConfigPath], { cwd: root, stdio: "inherit" });
 await execFileAsync("codesign", ["--sign", "-", executablePath], { cwd: root, stdio: "inherit" });
 await execFileAsync(executablePath, ["--version"], { cwd: root, stdio: "inherit" });
 

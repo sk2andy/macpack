@@ -1,6 +1,6 @@
 {
   "name": "macpack",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Universal macOS package manager CLI for Homebrew, npm, bun, uv, and git repository manifests.",
   "type": "module",
   "bin": {

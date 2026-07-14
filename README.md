@@ -50,7 +50,7 @@ Or install directly:
 brew install sk2andy/tap/macpack
 ```
 
-The Homebrew formula installs the `v0.2` macOS Apple Silicon executable from
+The Homebrew formula installs the `v0.3` macOS Apple Silicon executable from
 the GitHub release.
 
 For local development:
@@ -195,16 +195,22 @@ Install or update packages in the manifest:
 ```bash
 macpack apply --file examples/packages.macpack
 macpack apply
+macpack apply npm
+macpack apply brew
 ```
 
 Repository entries are cloned when their target directory is missing. Existing
 repositories are left in place; if the target exists with a different origin,
 apply fails instead of overwriting it.
 
+Pass a manager to apply only that section and skip the others. Supported
+managers are `brew`, `npm`, `pnpm`, `bun`, `uv`, `repo`, `repos`, and `all`.
+
 Remove packages that are installed but no longer listed:
 
 ```bash
 macpack apply --file examples/packages.macpack --cleanup
+macpack apply npm --cleanup
 ```
 
 Preview commands without making changes:
@@ -385,7 +391,7 @@ npm pack --dry-run
 ## Releases
 
 Releases are built by GitHub Actions. Run the `Release` workflow manually and
-provide a tag/version such as `v0.2`.
+provide a tag/version such as `v0.3`.
 
 The workflow runs on GitHub's `macos-26` arm64 runner, builds a darwin-arm64
 executable, creates a source archive, creates checksums, and publishes a GitHub
